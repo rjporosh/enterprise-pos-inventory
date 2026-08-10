@@ -1,0 +1,42 @@
+services:
+  pos-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5001:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=${POS_DB_CONNECTION}
+      - Redis__ConnectionString=${REDIS_CONNECTION}
+      - RabbitMQ__Host=rabbitmq
+      - ServiceName=pos-service
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - pos-network
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pos_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pos-db-data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+
+volumes:
+  pos-db-data:
+
+networks:
+  pos-network:
+    driver: bridge

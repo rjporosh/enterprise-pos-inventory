@@ -1,0 +1,42 @@
+services:
+  inventory-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5002:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=${INVENTORY_DB_CONNECTION}
+      - Redis__ConnectionString=${REDIS_CONNECTION}
+      - RabbitMQ__Host=rabbitmq
+      - ServiceName=inventory-service
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - inventory-network
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: inventory_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - inventory-db-data:/var/lib/postgresql/data
+    networks:
+      - inventory-network
+
+volumes:
+  inventory-db-data:
+
+networks:
+  inventory-network:
+    driver: bridge

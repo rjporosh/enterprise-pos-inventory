@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pos-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pos_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pos-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pos-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: pos-redis
+    restart: always
+    ports:
+      - "6380:6379"
+    volumes:
+      - pos-redis-data:/data
+    networks:
+      - pos-network
+
+  pos-api:
+    build:
+      context: ../..
+      dockerfile: services/pos-service/Dockerfile
+    container_name: pos-api
+    restart: always
+    ports:
+      - "5001:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=pos_db;Username=postgres;Password=postgres
+      - Redis__ConnectionString=redis:6379
+      - RabbitMQ__Host=rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pos-network
+
+volumes:
+  pos-db-data:
+  pos-redis-data:
+
+networks:
+  pos-network:
+    driver: bridge

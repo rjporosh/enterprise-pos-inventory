@@ -1,0 +1,85 @@
+version: "3.8"
+
+volumes:
+  pos-db-data:
+  inventory-db-data:
+  pos-redis-data:
+  inventory-redis-data:
+  rabbitmq-data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: enterprise-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pos_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pos-db-data:/var/lib/postgresql/data
+      - ./scripts/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - enterprise-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: enterprise-redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - enterprise-network
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: enterprise-rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics check_port_connectivity || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - enterprise-network
+
+  seq:
+    image: datalust/seq:latest
+    container_name: enterprise-seq
+    restart: always
+    environment:
+      ACCEPT_EULA: Y
+      SEQ_FIRSTRUN_ADMINPASSWORD: admin123
+    ports:
+      - "5341:80"
+    volumes:
+      - seq-data:/data
+    networks:
+      - enterprise-network
+
+networks:
+  enterprise-network:
+    driver: bridge
