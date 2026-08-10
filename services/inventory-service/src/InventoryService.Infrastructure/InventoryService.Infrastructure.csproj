@@ -10,6 +10,7 @@
     <ProjectReference Include="..\..\..\..\shared\shared-kernel\src\shared-kernel.csproj" />
     <ProjectReference Include="..\..\..\..\shared\shared-infrastructure\src\shared-infrastructure.csproj" />
     <ProjectReference Include="..\InventoryService.Domain\InventoryService.Domain.csproj" />
+    <ProjectReference Include="..\..\src\InventoryService.Application\InventoryService.Application.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>

@@ -32,13 +32,13 @@ public class Product : BaseEntity
 
     public Product(string name, string sku, Guid categoryId, Guid brandId, Guid unitId, decimal costPrice, decimal sellingPrice)
     {
-        Name = name;
-        Sku = sku;
+        Name = SharedKernel.Guard.NotNullOrEmpty(name, nameof(name));
+        Sku = SharedKernel.Guard.NotNullOrEmpty(sku, nameof(sku));
         CategoryId = categoryId;
         BrandId = brandId;
         UnitId = unitId;
-        CostPrice = costPrice;
-        SellingPrice = sellingPrice;
+        CostPrice = SharedKernel.Guard.NotNegative(costPrice, nameof(costPrice));
+        SellingPrice = SharedKernel.Guard.NotNegative(sellingPrice, nameof(sellingPrice));
     }
 
     public void UpdatePrice(decimal costPrice, decimal sellingPrice)

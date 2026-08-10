@@ -14,7 +14,7 @@ public class Category : BaseEntity
 
     public Category(string name, string? description = null, Guid? parentCategoryId = null)
     {
-        Name = name;
+        Name = SharedKernel.Guard.NotNullOrEmpty(name, nameof(name));
         Description = description;
         ParentCategoryId = parentCategoryId;
     }

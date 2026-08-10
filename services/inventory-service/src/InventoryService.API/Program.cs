@@ -42,6 +42,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddSharedInfrastructure();
 builder.Services.AddDatabaseProvider(builder.Configuration);
 
+builder.Services.AddScoped<InventoryService.Application.Products.Repositories.IProductRepository, InventoryService.Infrastructure.Repositories.ProductRepository>();
+
 builder.Services.AddResponseCaching();
 builder.Services.AddHttpContextAccessor();
 

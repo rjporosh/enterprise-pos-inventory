@@ -3,8 +3,8 @@
 ## v0.1.0
 
 **Release Date:** 2026-08-11  
-**Milestone:** Phase C — Inventory Database Foundation  
-**Build:** `20260811.001`  
+**Milestone:** Phase C + Phase D — Inventory Database Foundation + Product Catalog CRUD  
+**Build:** `20260811.002`  
 **Environment:** Development
 
 ---
@@ -14,12 +14,23 @@
 ### Database Foundation
 - [x] Created `InventoryDbContext` with automatic audit field population
 - [x] Implemented soft-delete query filters
--x] Created domain entities: Product, Category, Brand, Unit, Supplier, Warehouse
+- [x] Created domain entities: Product, Category, Brand, Unit, Supplier, Warehouse
 - [x] Created entity configurations with explicit indexes and constraints
 - [x] Created EF Core migration `InitialCreate` with full schema
 - [x] Created seed data migration with initial units, categories, brands, warehouses
 - [x] Added design-time factory for EF Core tools
 - [x] Schema: `inventory` in `inventory_db`
+
+### Product Catalog CRUD (Phase D)
+- [x] Created `CreateProductCommand` + Handler with SKU/barcode uniqueness validation
+- [x] Created `GetProductByIdQuery` + Handler with soft-delete check
+- [x] Created `GetAllProductsQuery` + Handler with pagination, filtering, sorting
+- [x] Created `UpdateProductCommand` + Handler with SKU/barcode uniqueness validation
+- [x] Created `DeleteProductCommand` + Handler with soft-delete
+- [x] Created `ProductDto`, `ProductListItemDto`, `CreateProductRequest`, `UpdateProductRequest`
+- [x] Created `ProductsController` with full CRUD endpoints
+- [x] Created `IProductRepository` interface + `ProductRepository` implementation
+- [x] Added FluentValidation validators for all commands/queries
 
 ### API Endpoints
 | Endpoint | Method | Description |
@@ -30,10 +41,15 @@
 | `GET /api/v1/system/release` | GET | Release/build information |
 | `GET /openapi/v1.json` | GET | OpenAPI specification |
 | `GET /scalar/v1` | GET | Scalar API reference |
+| `POST /api/v1/products` | POST | Create product |
+| `GET /api/v1/products/{id}` | GET | Get product by ID |
+| `GET /api/v1/products` | GET | Get all products (paged, filtered, sorted) |
+| `PUT /api/v1/products/{id}` | PUT | Update product |
+| `DELETE /api/v1/products/{id}` | DELETE | Soft-delete product |
 
 ### Testing
 - [x] Unit tests: CategoryTests, ProductTests, BrandTests, SupplierTests, WarehouseTests
-- [x] Unit tests: CreateProductValidatorTests
+- [x] Unit tests: CreateProductHandlerTests, DeleteProductHandlerTests, GetAllProductsHandlerTests
 - [x] Integration test infrastructure: IntegrationTestBase with Respawn
 - [x] Functional tests: ReleaseEndpointTests, HealthCheckTests, DatabaseMigrationTests
 
@@ -86,19 +102,29 @@
 
 ## Bug Fixes
 
-None in this release.
+- [x] Fixed `BaseEntity` constructor to auto-generate GUID Ids
+- [x] Fixed domain entity constructors to validate input using `Guard`
+- [x] Fixed `Application.csproj` project reference path to Domain
+- [x] Fixed `Infrastructure.csproj` to reference Application for repository implementation
+- [x] Fixed repository implementation placement (moved from Application to Infrastructure)
+- [x] Fixed unit tests to use mocked `IProductRepository` instead of `InventoryDbContext`
 
 ---
 
 ## Breaking Changes
 
-None. This is an initial release.
+None in this release.
 
 ---
 
 ## API Changes
 
-No public product CRUD endpoints yet. Foundation endpoints only.
+### New Product CRUD Endpoints
+- `POST /api/v1/products` — Create a new product
+- `GET /api/v1/products/{id}` — Get product by ID
+- `GET /api/v1/products` — Get all products with pagination, filtering, sorting
+- `PUT /api/v1/products/{id}` — Update an existing product
+- `DELETE /api/v1/products/{id}` — Soft-delete a product
 
 ---
 
@@ -121,8 +147,8 @@ No public product CRUD endpoints yet. Foundation endpoints only.
 
 | Test Suite | Status |
 |-----------|--------|
-| Inventory Unit Tests | ✅ 8 tests |
-| Inventory Integration Tests | ✅ 2 tests |
+| Inventory Unit Tests | ✅ 20 tests |
+| Inventory Integration Tests | ✅ Scaffolded |
 | Inventory Functional Tests | ✅ 1 test |
 | Build | ✅ Succeeded |
 
@@ -131,7 +157,6 @@ No public product CRUD endpoints yet. Foundation endpoints only.
 ## Known Issues
 
 - No authentication/authorization implemented (Phase B/C)
-- No product CRUD endpoints yet (Phase D)
 - No stock management yet (Phase E)
 - Docker not available in current environment for live DB verification
 
@@ -168,7 +193,8 @@ dotnet ef database update 0 \
 
 1. Health endpoints return 200 OK
 2. Release endpoint returns service information
-3. Database schema matches documentation
-4. Seed data is present (units, categories, brands, warehouses)
-5. Build succeeds with no errors
-6. Unit tests pass (8 tests)
+3. Product CRUD endpoints work correctly
+4. Database schema matches documentation
+5. Seed data is present (units, categories, brands, warehouses)
+6. Build succeeds with no errors
+7. Unit tests pass (20 tests)

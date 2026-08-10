@@ -17,5 +17,8 @@ public abstract class BaseEntity<TId> : Entity<TId>, IAuditableEntity, ISoftDele
 
 public abstract class BaseEntity : BaseEntity<Guid>, IAggregateRoot
 {
-    protected BaseEntity() : base() { }
+    protected BaseEntity() : base()
+    {
+        Id = Guid.NewGuid();
+    }
 }

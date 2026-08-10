@@ -13,7 +13,7 @@ public class Brand : BaseEntity
 
     public Brand(string name, string? description = null, string? website = null)
     {
-        Name = name;
+        Name = SharedKernel.Guard.NotNullOrEmpty(name, nameof(name));
         Description = description;
         Website = website;
     }
