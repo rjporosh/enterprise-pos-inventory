@@ -1,171 +1,232 @@
-# MASTER PROMPT — Enterprise POS & Inventory Management System (SaaS Ready)
+You are a Principal Enterprise Software Architect, Senior Product Designer, Senior UX Architect, Angular 22 Architect, React 19 Architect, and SaaS ERP Product Designer.
 
-You are acting as a Principal Software Architect, Staff Software Engineer, Database Architect, DevOps Engineer, QA Engineer, UI/UX Engineer and Technical Writer.
+Your objective is to design and build a production-quality, enterprise-grade, multi-tenant SaaS Retail Management Platform.
 
-Your objective is to build a production-quality Enterprise POS & Inventory Management System suitable for commercial resale, GitHub portfolio, senior software engineering interviews and future SaaS deployment.
+This is NOT a demo, portfolio, or tutorial project.
 
-This is NOT a CRUD application.
+The frontend architecture must be scalable enough to support thousands of businesses and millions of transactions in the future.
 
-Every design decision must prioritize scalability, maintainability, extensibility, security and long-term commercial use.
+The application should be suitable for any retail business, including but not limited to:
 
-==========================================================
-VISION
-==========================================================
+- Clothing Store
+- Boutique
+- Burkha/Hijab Shop
+- Super Shop
+- Grocery Store
+- Pharmacy
+- Electronics Shop
+- Mobile Shop
+- Computer Shop
+- Motor Parts Shop
+- Auto Parts Shop
+- Hardware Store
+- Cosmetics Shop
+- Furniture Store
+- Book Store
+- Sports Shop
+- Gift Shop
+- Pet Shop
+- Bakery
+- Restaurant (Future Module)
+- Wholesale Business
+- Distribution Company
 
-Initially support a single store.
+The system must be designed as a configurable Multi-Tenant SaaS product where each business has its own:
 
-However, the architecture MUST be SaaS-ready and Multi-Tenant Ready so multiple businesses, branches and users can be added in the future with minimal changes.
+- Company
+- Branches
+- Warehouses
+- Products
+- Employees
+- Customers
+- Suppliers
+- Reports
+- Settings
+- Branding
 
-The codebase must remain modular and extensible.
+No business-specific logic should be hardcoded.
 
-==========================================================
+Every feature should be configurable.
+
+--------------------------------------------------
 TECH STACK
-==========================================================
+--------------------------------------------------
 
-Backend
+POS Application
 
-- ASP.NET Core 10 Web API
-- C#
-- Clean Architecture
-- Vertical Slice Architecture
-- CQRS
-- MediatR
-- FluentValidation
-- EF Core 10
-- Result Pattern
-- Dependency Injection
-
-Frontend
-
-- Angular 22
+- Angular 22 (Latest)
 - Standalone Components
-- Signals
+- Angular Signals
 - Angular Material
-- Responsive Design
+- TypeScript
+- SCSS
+- RxJS where appropriate
 - Lazy Loading
+- Feature-based Architecture
+- Responsive Design
+- Light & Dark Theme
 
-Database
+Inventory & Back Office
 
-Primary Database
+- React 19 (Latest)
+- TypeScript
+- Material UI (MUI)
+- React Router
+- TanStack Query
+- Zustand or Redux Toolkit
+- SCSS
+- Responsive Design
+- Light & Dark Theme
 
-- PostgreSQL
+--------------------------------------------------
+IMPORTANT
+--------------------------------------------------
 
-Supported Providers
+Frontend UI only.
 
-- PostgreSQL
-- SQL Server
-- MySQL
-- Oracle
+Do NOT create:
 
-Switch provider using configuration only.
+- Backend
+- Authentication
+- Authorization
+- Database
+- Express
+- NestJS
+- Spring Boot
+- .NET
+- Laravel
 
-Infrastructure
+Use only:
 
-- Docker
-- Docker Compose
-- Redis
-- RabbitMQ
-- Serilog
-- OpenTelemetry
-- OpenAPI
-- Scalar
-- Health Checks
+- Mock Services
+- Mock API Layer
+- Fake JSON Data
+- Interfaces
+- Models
 
-==========================================================
-MODULES
-==========================================================
+The application should be backend-ready.
 
-Authentication
+--------------------------------------------------
+DESIGN INSPIRATION
+--------------------------------------------------
 
-Users
+The UI quality should be comparable to enterprise software such as:
 
-Roles
+- Microsoft Dynamics 365
+- SAP Business One
+- Oracle NetSuite
+- Odoo Enterprise
+- Zoho Inventory
+- Shopify POS
+- Square POS
+- Lightspeed Retail
+- Vend POS
+- QuickBooks Commerce
 
-Permissions
+The design should feel modern, premium, clean, fast, and highly usable for cashiers, managers, warehouse staff, and business owners.
 
-Store
+--------------------------------------------------
+DESIGN SYSTEM
+--------------------------------------------------
 
-Branch
+Create a complete design system including:
 
-Warehouse
+- Color Palette
+- Typography
+- Spacing System
+- Elevation
+- Icons
+- Buttons
+- Forms
+- Cards
+- Tables
+- Chips
+- Badges
+- Dialogs
+- Toast Notifications
+- Loaders
+- Skeleton Screens
+- Empty States
+- Error States
+- Charts
+- KPI Widgets
+- Breadcrumbs
+- Side Navigation
+- Top Navigation
+- User Menu
+- Search UI
+- Global Command Palette
+- Responsive Grid System
 
-Categories
+--------------------------------------------------
+ANGULAR POS MODULE
+--------------------------------------------------
 
-Brands
-
-Units
-
-Products
-
-Barcode
-
-QR Code
-
-Suppliers
-
-Customers
-
-Purchases
-
-Purchase Returns
-
-Sales
-
-Sales Returns
-
-Inventory
-
-Stock Adjustment
-
-Stock Transfer
-
-Stock Ledger
-
-Damaged Products
-
-Expenses
-
-Income
-
-Cash Counter
-
-Shift Management
-
-POS
-
-Receipt Printing
+Design a complete POS interface including:
 
 Dashboard
 
-Reports
+New Sale
 
-Notifications
-
-Audit Logs
-
-Settings
-
-Backup
-
-Restore
-
-==========================================================
-POINT OF SALE
-==========================================================
-
-Support
+Quick Sale
 
 Barcode Scanner
 
-Manual Search
+Barcode Search
+
+Product Grid
 
 Product Search
 
+Category Shortcuts
+
+Cart
+
+Customer Selection
+
+Walk-in Customer
+
 Discount
+
+Coupon
 
 Tax
 
+Service Charge
+
+Price Override
+
+Quantity Update
+
+Hold Sale
+
+Resume Sale
+
+Suspend Sale
+
+Sales History
+
+Returns
+
+Exchange
+
+Receipt Preview
+
+Receipt Print
+
+Kitchen Ticket (Future Ready)
+
+Cash Drawer
+
+Opening Cash
+
+Closing Cash
+
+Shift Closing
+
 Multiple Payment Methods
+
+Split Payment
 
 Cash
 
@@ -173,496 +234,326 @@ Card
 
 Mobile Banking
 
-Split Payment
+Gift Card
 
-Receipt Printing
+Store Credit
 
-Thermal Printer
+Due Payment
 
-Invoice Reprint
+Refund
 
-Hold Sale
+Offline Ready UI
 
-Resume Sale
+Keyboard Shortcuts
 
-Return Sale
+--------------------------------------------------
+REACT INVENTORY & BACK OFFICE MODULE
+--------------------------------------------------
 
-Quick Checkout
+Dashboard
 
-==========================================================
-BARCODE
-==========================================================
+Products
 
-Automatically generate
+Product Details
 
-SKU
+Variants
 
-Barcode
+SKU Management
 
-QR Code
+Barcode Management
 
-Product Label
+Categories
 
-Printable Stickers
+Brands
 
-Barcode must be printable and reusable.
+Units
 
-==========================================================
-INVENTORY
-==========================================================
+Attributes
 
-Support
+Suppliers
 
-Stock In
+Customers
 
-Stock Out
+Warehouses
+
+Purchase Orders
+
+Goods Receive Note
+
+Stock Transfer
 
 Stock Adjustment
 
-Inventory History
+Stock Count
+
+Inventory Audit
 
 Stock Ledger
 
-Low Stock Alert
-
-Out of Stock
-
-Fast Moving Products
-
-Slow Moving Products
-
-Dead Stock
+Stock Movement
 
 Inventory Valuation
 
-FIFO Ready
+Low Stock
 
-Average Cost Ready
+Out of Stock
 
-==========================================================
-FINANCE
-==========================================================
+Dead Stock
 
-Track
+Fast Moving Items
 
-Daily Sales
+Slow Moving Items
 
-Daily Expenses
+Reorder Suggestions
 
-Daily Profit
+Barcode Printing
 
-Monthly Profit
+Label Printing
 
-Half-Yearly Profit
+Reports
 
-Yearly Profit
+Export
 
-Cash Flow
+Dashboard Analytics
+
+--------------------------------------------------
+ADVANCED TABLE FEATURES
+--------------------------------------------------
+
+Every table should support:
+
+Search
+
+Filtering
+
+Sorting
+
+Column Resize
+
+Column Reorder
+
+Column Visibility
+
+Pagination
+
+Sticky Header
+
+Row Selection
+
+Bulk Actions
+
+CSV Export
+
+Excel Export
+
+PDF Export (UI only)
+
+Print
+
+--------------------------------------------------
+DASHBOARDS
+--------------------------------------------------
+
+Design professional dashboards containing:
 
 Revenue
 
-Net Profit
+Sales
 
-Gross Profit
+Profit
 
-==========================================================
-REPORTS
-==========================================================
+Expenses
 
-Generate
+Purchases
 
-Daily
+Orders
 
-Weekly
+Returns
 
-Monthly
+Inventory Value
 
-Quarterly
+Top Products
 
-Half-Yearly
+Top Customers
 
-Yearly
+Top Categories
 
-Custom Date Range
+Warehouse Status
 
-Top Selling Products
+Recent Activities
 
-Least Selling Products
+Charts
 
-Customer Reports
+KPIs
 
-Supplier Reports
+Widgets
 
-Inventory Reports
+--------------------------------------------------
+MULTI-TENANT STRUCTURE
+--------------------------------------------------
 
-Expense Reports
+Design the UI to support:
 
-Profit Reports
+Organization
 
-Sales Reports
+Tenant
 
-Purchase Reports
+Branch
 
-Cash Reports
+Warehouse
 
-Export PDF
+Store
 
-Export Excel
+Role
 
-==========================================================
-AUTOMATION
-==========================================================
+Permissions (UI placeholders only)
 
-Every day at 12:00 AM
+Business Settings
 
-Automatically generate
+Branding
 
-Daily Sales Report
+Currency
 
-Daily Expense Report
+Timezone
 
-Daily Profit Report
+Language
 
-Cash Summary
+Tax Settings
 
-Top Selling Products
+Invoice Settings
 
-Low Stock Report
+Receipt Settings
 
-Inventory Summary
+--------------------------------------------------
+REUSABLE COMPONENTS
+--------------------------------------------------
 
-Prepare reports for Email and future messaging integrations.
+Create reusable components for:
 
-==========================================================
-SECURITY
-==========================================================
+Data Table
 
-Implement
+Search Box
 
-JWT
+Filter Drawer
 
-Refresh Token
+Status Badge
 
-Role Based Authorization
+Metric Card
 
-Permission Based Authorization
+Stat Card
 
-Global Exception Middleware
+Charts
 
-Validation
+Dialogs
 
-Audit Logging
+Drawer
 
-Optimistic Concurrency
+Confirm Modal
 
-Transactions
+Delete Modal
 
-OWASP Best Practices
+Product Card
 
-==========================================================
-DATABASE
-==========================================================
+Empty State
 
-Generate
+Loading State
 
-Migrations
+Error State
 
-Seed Data
+Page Header
 
-Provider Abstraction
+Action Toolbar
 
-On first startup
+Breadcrumb
 
-If database does not exist
+--------------------------------------------------
+PROJECT STRUCTURE
+--------------------------------------------------
 
-Create Database
+Use enterprise-level folder structures for both Angular and React.
 
-Run Migrations
+Include:
 
-Run Seeders
+Components
 
-Create Admin User
+Pages
 
-Insert Default Roles
+Layouts
 
-Insert Sample Categories
+Shared
 
-Insert Sample Products
+Core
 
-Insert Demo Data
+Services
 
-==========================================================
-LOGGING
-==========================================================
+Interfaces
 
-Generate
+Models
 
-logs/
+Constants
 
-application/
+Utilities
 
-runtime-errors/
+Routes
 
-build-errors/
+Guards (placeholder only)
 
-queries/
+Theme
 
-http/
+Assets
 
-audit/
+Mock API
 
-Every runtime error
+Sample JSON Data
 
-Save
+--------------------------------------------------
+DATA
+--------------------------------------------------
 
-Timestamp
+Populate the application with realistic enterprise mock data including:
 
-Exception
+Products
 
-Cause
+Customers
 
-Stack Trace
+Suppliers
 
-Suggested Fix
+Employees
 
-Environment
+Branches
 
-Every SQL query
+Warehouses
 
-Log
+Orders
 
-Controller
+Invoices
 
-Method
+Payments
 
-Endpoint
+Purchase Orders
 
-SQL
+Inventory Movements
 
-Execution Time
+Reports
 
-Rows
+The application should feel like a real, production ERP system with realistic datasets rather than placeholder content.
 
-Timestamp
+--------------------------------------------------
+QUALITY REQUIREMENTS
+--------------------------------------------------
 
-==========================================================
-OBSERVABILITY
-==========================================================
+The code must be:
 
-Prepare integrations
+- Production-ready
+- Clean Architecture
+- Fully Componentized
+- Scalable
+- Maintainable
+- Strongly Typed
+- Responsive
+- Accessible
+- Reusable
+- Consistent
+- Enterprise-grade
 
-Serilog
-
-Seq
-
-Grafana
-
-Prometheus
-
-OpenTelemetry
-
-Elasticsearch
-
-Kibana
-
-Graylog
-
-==========================================================
-TESTING
-==========================================================
-
-Generate
-
-Unit Tests
-
-Integration Tests
-
-API Tests
-
-Load Tests
-
-Stress Tests
-
-Smoke Tests
-
-Performance Tests
-
-==========================================================
-CI/CD
-==========================================================
-
-Prepare
-
-GitHub Actions
-
-Restore
-
-Build
-
-Test
-
-Docker Build
-
-Publish
-
-Deployment
-
-Rollback
-
-==========================================================
-DOCUMENTATION
-==========================================================
-
-Generate
-
-README.md
-
-MASTER-SPEC.md
-
-ROADMAP.md
-
-ARCHITECTURE.md
-
-DATABASE.md
-
-API.md
-
-SETUP.md
-
-SECURITY.md
-
-DEPLOYMENT.md
-
-FEATURES.md
-
-CHANGELOG.md
-
-DEVELOPER-GUIDE.md
-
-==========================================================
-MERMAID
-==========================================================
-
-Generate
-
-ER Diagram
-
-Use Case
-
-Sequence
-
-Activity
-
-Class
-
-Deployment
-
-Container
-
-==========================================================
-AI CONTINUATION
-==========================================================
-
-At the end of every milestone
-
-Update all documentation.
-
-Generate
-
-AI-HANDOVER.md
-
-Include
-
-Completed Features
-
-Pending Features
-
-Architecture Decisions
-
-Database Changes
-
-API Changes
-
-Frontend Changes
-
-Files Changed
-
-Known Issues
-
-Next Milestone
-
-Suggested Git Commit
-
-Prompt to continue development
-
-==========================================================
-COMMERCIAL REQUIREMENTS
-==========================================================
-
-Design the application to support future
-
-Multi-Tenant SaaS
-
-Subscription Plans
-
-Feature Flags
-
-Tenant Isolation
-
-Multiple Branches
-
-Multiple Warehouses
-
-Multiple Stores
-
-White Label Branding
-
-Localization
-
-Multiple Languages
-
-Multiple Currencies
-
-Tax Configuration
-
-Invoice Templates
-
-Plugin Architecture
-
-REST API
-
-Future Mobile Application
-
-Future E-commerce Integration
-
-Future Accounting Integration
-
-Future Payment Gateway Integration
-
-==========================================================
-RULES
-==========================================================
-
-Never generate placeholder code.
-
-Never leave TODO comments.
-
-Never fake completed features.
-
-Every milestone must
-
-Compile successfully
-
-Build successfully
-
-Pass tests
-
-Update documentation
-
-Generate AI-HANDOVER.md
-
-Create Conventional Git Commit
-
-Wait for approval before starting the next milestone.
-
-The final solution must be production-ready, Dockerized and demonstrate enterprise engineering standards suitable for commercial deployment.
+Focus on delivering a premium user experience that can later be connected to a real backend without requiring major frontend restructuring.
