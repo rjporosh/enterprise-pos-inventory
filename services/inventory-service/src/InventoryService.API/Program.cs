@@ -43,6 +43,7 @@ builder.Services.AddSharedInfrastructure();
 builder.Services.AddDatabaseProvider(builder.Configuration);
 
 builder.Services.AddScoped<InventoryService.Application.Products.Repositories.IProductRepository, InventoryService.Infrastructure.Repositories.ProductRepository>();
+builder.Services.AddScoped<global::InventoryService.Application.Stock.IStockRepository, InventoryService.Infrastructure.Repositories.StockRepository>();
 
 builder.Services.AddResponseCaching();
 builder.Services.AddHttpContextAccessor();
