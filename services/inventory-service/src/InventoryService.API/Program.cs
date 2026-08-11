@@ -39,8 +39,17 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
-builder.Services.AddSharedInfrastructure();
+builder.Services.AddSharedInfrastructure(typeof(InventoryService.Application.Products.CreateProduct.CreateProductCommand).Assembly);
 builder.Services.AddDatabaseProvider(builder.Configuration);
+
+builder.Services.AddScoped(sp =>
+{
+    var dbContextFactory = sp.GetRequiredService<IDbContextFactory>();
+    var connectionString = builder.Configuration["Database:ConnectionString"]
+        ?? throw new InvalidOperationException("Database:ConnectionString is not configured.");
+    var options = dbContextFactory.CreateOptions<InventoryService.Infrastructure.Persistence.InventoryDbContext>(connectionString);
+    return new InventoryService.Infrastructure.Persistence.InventoryDbContext(options);
+});
 
 builder.Services.AddScoped<InventoryService.Application.Products.Repositories.IProductRepository, InventoryService.Infrastructure.Repositories.ProductRepository>();
 builder.Services.AddScoped<global::InventoryService.Application.Stock.IStockRepository, InventoryService.Infrastructure.Repositories.StockRepository>();
