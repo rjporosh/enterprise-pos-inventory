@@ -10,6 +10,7 @@
     <ProjectReference Include="..\..\..\..\shared\shared-kernel\src\shared-kernel.csproj" />
     <ProjectReference Include="..\..\..\..\shared\shared-infrastructure\src\shared-infrastructure.csproj" />
     <ProjectReference Include="..\PosService.Domain\PosService.Domain.csproj" />
+    <ProjectReference Include="..\PosService.Application\PosService.Application.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>
