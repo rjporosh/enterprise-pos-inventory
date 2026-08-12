@@ -58,6 +58,9 @@ builder.Services.AddScoped<PosService.Application.Registers.ICashRegisterReposit
 builder.Services.AddScoped<PosService.Application.Registers.ICashSessionRepository, PosService.Infrastructure.Repositories.CashSessionRepository>();
 builder.Services.AddScoped<PosService.Application.Customers.ICustomerRepository, PosService.Infrastructure.Repositories.CustomerRepository>();
 builder.Services.AddScoped<PosService.Application.Sales.Repositories.ISaleRepository, PosService.Infrastructure.Repositories.SaleRepository>();
+builder.Services.AddScoped<PosService.Application.Reporting.IDailySalesReportRepository, PosService.Infrastructure.Repositories.DailySalesReportRepository>();
+builder.Services.AddScoped<PosService.Application.Reporting.IDailySalesReportGenerator, PosService.Application.Reporting.DailySalesReportGenerator>();
+builder.Services.AddHostedService<PosService.Infrastructure.Reporting.DailySalesReportJob>();
 
 // No message broker is registered by default so POS's own checkout flow never hard-depends on RabbitMQ
 // (PRIMARY GOAL: RabbitMQ must not become mandatory for either service's independent core functionality).

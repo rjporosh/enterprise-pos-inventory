@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PosService.Domain.Cashiers;
 using PosService.Domain.Customers;
 using PosService.Domain.Registers;
+using PosService.Domain.Reporting;
 using PosService.Domain.Sales;
 using PosService.Domain.Stores;
 
@@ -17,6 +18,7 @@ public class PosDbContext(DbContextOptions<PosDbContext> options) : BaseDbContex
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<DailySalesReport> DailySalesReports => Set<DailySalesReport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
