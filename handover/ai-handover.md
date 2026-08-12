@@ -1,424 +1,262 @@
-# AI Handover — Enterprise POS & Inventory Backend Foundation
+# AI Handover — Enterprise POS & Inventory Backend
 
-**Last Updated:** 2026-08-11T04:44:00+06:00  
+**Last Updated:** 2026-08-12T20:34:00+00:00
 **Current Branch:** main
+**Last Commit:** 14bd1d0 test(load): add k6 load test scripts and POS integration test scaffold
+
+---
+
+## ⚠️ Read this first: environment limitation that shaped this whole session
+
+The environment this session ran in had **no .NET SDK installed and no network access**. Every file
+below was written by hand, reasoned about carefully against the existing code's own conventions, and
+cross-checked for consistency — but **none of it has been compiled, restored, or tested**. Two
+pre-existing runtime bugs were found and fixed by careful reading, not by a failing test (see "Bugs
+fixed" below). Treat everything in this document as "should be correct" not "verified correct" until
+someone runs the commands in **Next Exact Task** on a machine with the SDK.
 
 ---
 
 ## Current Phase
 
-**Phase E** — Inventory Stock/Ledger Foundation (Complete)
+Roadmap phases **F, G, H, I, J are complete**. **Phase K is partially complete** (stopped mid-phase at
+the user's explicit request — see below). **Phase L has not been started.**
 
 ---
 
-## Current Milestone
+## What actually got done this session, in commit order
 
-Stock management feature with CQRS handlers, validators, repository pattern, and comprehensive tests. All 48 unit tests passing.
+1. **`3939da9` fix(shared):** wired up MediatR handler discovery and DbContext DI registration.
+   Two genuine, pre-existing runtime bugs (present since the Phase D/E commits, before this session
+   started) that would have made **every existing Inventory endpoint throw at runtime**:
+   - `AddSharedInfrastructure()` only ever registered MediatR handlers from the SharedInfrastructure
+     assembly itself — never from `InventoryService.Application`/`PosService.Application` — so
+     `mediator.Send(...)` had no handler to resolve, for anything.
+   - `InventoryDbContext` was never registered in the DI container at all, so `IProductRepository`/
+     `IStockRepository` (which take it via constructor injection) could never be constructed.
+   Fixed by extending `AddSharedInfrastructure` to accept the calling service's Application assembly,
+   and by registering the DbContext through the existing `IDbContextFactory` abstraction (ADR-003).
 
----
+2. **`ffdb2b0` feat(pos): implement database foundation** (Phase F). Domain entities (`Store`,
+   `Cashier`, `CashRegister`, `CashSession`, `Customer`, `Sale`, `SaleItem`, `Payment`), EF
+   configurations, `PosDbContext`, design-time factory, repository interfaces + implementations, a
+   hand-authored `InitialCreate` migration, domain unit tests. Also fixed `PosService.Infrastructure.csproj`,
+   which was missing its `ProjectReference` to `PosService.Application` (same class of gap as bug #1 above).
 
-## Completed Work
+3. **`8946c8c` feat(pos): implement sales checkout flow** (Phase G). Full CQRS slice: `CreateSale`,
+   `AddSaleItem`, `RemoveSaleItem`, `CompleteSale`, `VoidSale`, `GetSaleById`, `GetAllSales`,
+   `OpenSession`/`CloseSession` for cash sessions. `SalesController` + `CashSessionsController`.
+   `ISaleEventPublisher`/`NullSaleEventPublisher` seam added here so checkout has zero dependency on a
+   message broker by default.
 
-- [x] Created InventoryDbContext with BaseDbContext inheritance
-- [x] Created domain entities: Product, Category, Brand, Unit, Supplier, Warehouse
-- [x] Created entity configurations with indexes and foreign keys
-- [x] Created EF Core migration `InitialCreate` (20260810194119)
-- [x] Created EF Core migration `SeedInitialData` (20260810194318) with seed data
-- [x] Created design-time factory for EF Core tools
-- [x] Unit tests: 20 tests (domain entities + Product CRUD handlers)
-- [x] Integration tests: HealthCheckTests, DatabaseMigrationTests
-- [x] Functional tests: ReleaseEndpointTests
-- [x] Database documentation: schema, ER diagram, indexes, constraints, seed data
-- [x] C4 architecture documentation
-- [x] Programmer's guide (CRUD, scheduled jobs, background services, migrations, tests, logs, metrics)
-- [x] Observability guide (Serilog, Seq, Prometheus, Grafana, Jaeger, correlation IDs, idempotency)
-- [x] Load testing guide (k6, NBomber scenarios, thresholds)
-- [x] Stress testing guide (k6 stress test, success criteria, resource monitoring)
-- [x] Product CRUD: CreateProduct, GetProductById, GetAllProducts, UpdateProduct, DeleteProduct
-- [x] Product repository: IProductRepository + ProductRepository implementation
-- [x] FluentValidation validators for all product commands/queries
-- [x] ProductsController with full CRUD endpoints
-- [x] Unit tests for Product CRUD handlers (Create, Get, Update, Delete)
-- [x] Fixed BaseEntity constructor to auto-generate GUIDs
-- [x] Fixed domain entity constructors to validate input
-- [x] Updated release notes: inventory-service-v0.1.0.md
-- [x] Verified build: `dotnet build EnterprisePOS.sln` → Build succeeded
-- [x] Stock entity + configuration + migration
-- [x] StockMovement entity + configuration + migration
-- [x] Stock CRUD handlers: CreateStock, GetStockById, GetAllStocks, UpdateStock, DeleteStock
-- [x] Stock movement handlers: StockIn, StockOut, StockTransfer, StockAdjustment
-- [x] StocksController with full CRUD + movement endpoints
-- [x] Stock repository: IStockRepository + StockRepository implementation
-- [x] FluentValidation validators for all stock commands/queries
-- [x] Unit tests for Stock CRUD handlers (48 tests total, all passing)
-- [x] Fixed unit tests: null navigation properties, mock state tracking, SoftDelete callbacks
+4. **`079fd49` feat(integration): POS→Inventory stock sync over RabbitMQ** (Phase H).
+   `SaleCompletedIntegrationEvent`/`SaleVoidedIntegrationEvent` contracts in shared-kernel.
+   `RabbitMqSaleEventPublisher` (POS) publishes to a durable `pos.events` topic exchange; only
+   registered when `RabbitMQ:Host` is configured. `SaleEventsConsumer` (Inventory, `BackgroundService`)
+   consumes with a dead-letter queue, exponential-backoff reconnect (never crashes the host), and
+   idempotency via a new `ProcessedIntegrationEvent` inbox table. Added minimal `IWarehouseRepository`
+   to resolve Inventory's default warehouse for stock deduction/reversal.
 
----
+5. **`c013e79` feat(pos): implement daily sales reporting job** (Phase I). `DailySalesReport` entity
+   (one row per store/date, unique-indexed → idempotent), `DailySalesReportGenerator` (aggregates
+   completed sales into revenue/discount/tax/payment-method totals + top-10 products),
+   `DailySalesReportJob` (`BackgroundService`, runs at UTC midnight, 7-day catch-up scan on startup,
+   per-store failure isolation). `GET /api/v1/reports/daily-sales`.
+   **Known gap, not hidden:** `VoidedSalesCount` and `CashSessionSummaryJson` are placeholders
+   (0 / empty array) — needs a date-ranged query on `ICashSessionRepository` that doesn't exist yet.
 
-## Files Added
+6. **`1a20b68` feat(observability):** (Phase J). `CorrelationIdMiddleware` (shared), OpenTelemetry
+   tracing (OTLP export, opt-in via `Observability:OtlpEndpoint`) + metrics (`/metrics`, always on) via
+   `ObservabilityExtensions.AddObservability`, both wired into both `Program.cs` files. Optional EF
+   query logging via `Database:EnableQueryLogging`. `docs/observability/` guide + starter Prometheus
+   alert rules + Grafana dashboard JSON.
+   **Verification caveat:** the OpenTelemetry package versions in `shared-infrastructure.csproj`
+   (1.9.0 core, 1.9.0-rc.1 Prometheus exporter) were chosen from memory with no NuGet access to confirm
+   — run `dotnet restore` and adjust if resolution fails.
 
-### Inventory Domain Entities
-```
-services/inventory-service/src/InventoryService.Domain/Catalog/Category.cs
-services/inventory-service/src/InventoryService.Domain/Catalog/Brand.cs
-services/inventory-service/src/InventoryService.Domain/Catalog/Unit.cs
-services/inventory-service/src/InventoryService.Domain/Suppliers/Supplier.cs
-services/inventory-service/src/InventoryService.Domain/Warehouses/Warehouse.cs
-services/inventory-service/src/InventoryService.Domain/Products/Product.cs
-```
-
-### Inventory Infrastructure
-```
-services/inventory-service/src/InventoryService.Infrastructure/Persistence/InventoryDbContext.cs
-services/inventory-service/src/InventoryService.Infrastructure/Persistence/Configurations/
-  CategoryConfiguration.cs, BrandConfiguration.cs, UnitConfiguration.cs,
-  SupplierConfiguration.cs, WarehouseConfiguration.cs, ProductConfiguration.cs
-services/inventory-service/src/InventoryService.Infrastructure/InventoryDbContextDesignTimeFactory.cs
-services/inventory-service/src/InventoryService.Infrastructure/Migrations/
-  20260810194119_InitialCreate.cs, 20260810194318_SeedInitialData.cs
-  InventoryDbContextModelSnapshot.cs
-```
-
-### Unit Tests
-```
-services/inventory-service/tests/InventoryService.UnitTests/Domain/
-  CategoryTests.cs, BrandTests.cs, ProductTests.cs, SupplierTests.cs, WarehouseTests.cs
-services/inventory-service/tests/InventoryService.UnitTests/Application/CreateProductValidatorTests.cs
-```
-
-### Integration Tests
-```
-services/inventory-service/tests/InventoryService.IntegrationTests/
-  IntegrationTestBase.cs, HealthCheckTests.cs, DatabaseMigrationTests.cs
-```
-
-### Functional Tests
-```
-services/inventory-service/tests/InventoryService.FunctionalTests/ReleaseEndpointTests.cs
-```
-
-### Phase E: Stock/Ledger Foundation
-```
-services/inventory-service/src/InventoryService.Domain/Stock/
-  Stock.cs, StockMovement.cs, StockMovementType.cs
-services/inventory-service/src/InventoryService.Application/Stock/
-  Dtos/StockDto.cs, StockListItemDto.cs, StockMovementDto.cs,
-       CreateStockRequest.cs, UpdateStockRequest.cs
-  Repositories/IStockRepository.cs
-  CreateStock/CreateStockCommand.cs, CreateStockHandler.cs, CreateStockValidator.cs
-  GetStockById/GetStockByIdQuery.cs, GetStockByIdHandler.cs
-  GetAllStocks/GetAllStocksQuery.cs, GetAllStocksHandler.cs, GetAllStocksValidator.cs
-  UpdateStock/UpdateStockCommand.cs, UpdateStockHandler.cs, UpdateStockValidator.cs
-  DeleteStock/DeleteStockCommand.cs, DeleteStockHandler.cs
-  Movements/StockInCommand.cs, StockInHandler.cs
-         StockOutCommand.cs, StockOutHandler.cs
-         StockTransferCommand.cs, StockTransferHandler.cs
-         StockAdjustmentCommand.cs, StockAdjustmentHandler.cs
-services/inventory-service/src/InventoryService.Infrastructure/Repositories/
-  StockRepository.cs
-services/inventory-service/src/InventoryService.API/Controllers/
-  StocksController.cs
-services/inventory-service/tests/InventoryService.UnitTests/Stock/
-  CreateStockHandlerTests.cs, GetStockByIdHandlerTests.cs,
-  GetAllStocksHandlerTests.cs, UpdateStockHandlerTests.cs,
-  DeleteStockHandlerTests.cs
-  Movements/StockMovementHandlerTests.cs
-```
-
-### Documentation
-```
-services/inventory-service/docs/DATABASE.md
-services/inventory-service/docs/C4-ARCHITECTURE.md
-services/inventory-service/docs/PROGRAMMERS-GUIDE.md
-services/inventory-service/docs/OBSERVABILITY.md
-services/inventory-service/docs/LOAD-TESTING.md
-services/inventory-service/docs/STRESS-TESTING.md
-release-notes/inventory-service-v0.1.0.md
-release-notes/pos-service-v0.1.0.md
-docs/ROADMAP.md (updated)
-```
+7. **`14bd1d0` test(load):** (Phase K, **partial** — stopped here). Added
+   `scripts/load-test/inventory-load-test.js` (the script Inventory's `LOAD-TESTING.md` already
+   documented but that was never actually committed) and a new `scripts/load-test/pos-load-test.js`
+   (full checkout flow). Added `services/pos-service/docs/LOAD-TESTING.md`. Added
+   `PosService.IntegrationTests/IntegrationTestBase.cs` + `HealthCheckTests.cs`, mirroring Inventory's
+   existing pattern exactly (including its `WebApplicationFactory<object>` typing, which looks
+   questionable but matches precedent — flagged, not fixed, since fixing it would mean touching
+   Inventory's already-committed test infra too, which felt out of scope for a POS-focused pass).
 
 ---
 
-## Files Modified
+## Bugs fixed (all pre-existing, found by reading, not by a failing build)
 
-- `handover/ai-handover.md` (this file)
-- `release-notes/inventory-service-v0.1.0.md`
-- `services/inventory-service/src/InventoryService.Domain/Common/BaseEntity.cs` (auto-generate GUIDs)
-- `services/inventory-service/src/InventoryService.Domain/Catalog/Category.cs` (validation)
-- `services/inventory-service/src/InventoryService.Domain/Catalog/Brand.cs` (validation)
-- `services/inventory-service/src/InventoryService.Domain/Products/Product.cs` (validation)
-- `services/inventory-service/src/InventoryService.Application/InventoryService.Application.csproj` (fix reference)
-- `services/inventory-service/src/InventoryService.Infrastructure/InventoryService.Infrastructure.csproj` (add Application ref)
-- `services/inventory-service/src/InventoryService.API/Program.cs` (register repository)
+| Bug | File(s) | Fix |
+|---|---|---|
+| MediatR never discovered per-service handlers | `shared/shared-infrastructure/src/DependencyInjection.cs` | `AddSharedInfrastructure(params Assembly[])` |
+| `InventoryDbContext` never registered in DI | `InventoryService.API/Program.cs` | Registered via `IDbContextFactory` |
+| `PosService.Infrastructure.csproj` missing `ProjectReference` to `PosService.Application` | same file | Added the reference |
 
 ---
 
-## Database Changes
+## Migrations that need regeneration before real use — important
 
-### Schema: `inventory`
-**Database:** `inventory_db`
+**Three migrations in this session were hand-authored** because no `dotnet-ef` tooling was available:
 
-**Tables:**
-1. `inventory.units` — Measurement units (5 seed rows)
-2. `inventory.categories` — Product categories (5 seed rows, hierarchical)
-3. `inventory.brands` — Product brands (3 seed rows)
-4. `inventory.suppliers` — Supplier info
-5. `inventory.warehouses` — Warehouse management (2 seed rows)
-6. `inventory.products` — Product catalog
+1. `services/pos-service/src/PosService.Infrastructure/Migrations/20260812000000_InitialCreate.cs`
+2. `services/pos-service/src/PosService.Infrastructure/Migrations/20260812020000_AddDailySalesReport.cs`
+3. `services/inventory-service/src/InventoryService.Infrastructure/Migrations/20260812010000_AddIntegrationEventInbox.cs`
 
-**Indexes:** 14 indexes (unique: sku, barcode, brand name, unit symbol, warehouse code)
-
-**Foreign Keys:** products → categories, brands, units, suppliers (RESTRICT)
-
-**Money Types:** numeric(18,2) for prices, numeric(5,2) for percentages
-
-**Migration Status:**
-- `20260810194119_InitialCreate` — Schema creation
-- `20260810194318_SeedInitialData` — Seed data
+Each has `[DbContext]`/`[Migration]` attributes directly on the migration class so it's discoverable by
+`dotnet ef database update` **without** a paired `Designer.cs`/`*ModelSnapshot.cs` — those auto-generated
+files were deliberately **not** hand-forged (too easy to get subtly wrong in a way that's hard to debug
+later; better to have the real tool generate them). Each migration's doc comment has the exact
+`dotnet ef migrations add --force` command to run to regenerate it properly. **Do this before adding
+any further migrations to either service**, or the tooling will get confused about the true model state.
 
 ---
 
-## API Endpoints Added
+## Files touched this session (see `git log` for full commit bodies)
 
-| Service | Endpoint | Method | Description |
-|---------|----------|--------|-------------|
-| Inventory | `/health` | GET | Health check |
-| Inventory | `/health/live` | GET | Liveness probe |
-| Inventory | `/health/ready` | GET | Readiness probe |
-| Inventory | `/api/v1/system/release` | GET | Release information |
-| Inventory | `/api/v1/products` | POST | Create product |
-| Inventory | `/api/v1/products/{id}` | GET | Get product by ID |
-| Inventory | `/api/v1/products` | GET | Get all products (paged, filtered, sorted) |
-| Inventory | `/api/v1/products/{id}` | PUT | Update product |
-| Inventory | `/api/v1/products/{id}` | DELETE | Soft-delete product |
-| Inventory | `/openapi/v1.json` | GET | OpenAPI specification |
-| Inventory | `/scalar/v1` | GET | Scalar API reference |
-| POS | `/health` | GET | Health check |
-| POS | `/health/live` | GET | Liveness probe |
-| POS | `/health/ready` | GET | Readiness probe |
-| POS | `/api/v1/system/release` | GET | Release information |
-| POS | `/openapi/v1.json` | GET | OpenAPI specification |
-| POS | `/scalar/v1` | GET | Scalar API reference |
-
----
-
-## Tests Added
-
-| Test Suite | Tests | Status |
-|-----------|-------|--------|
-| Inventory Unit Tests | 48 | ✅ Pass |
-| Inventory Integration Tests | 2 | ✅ Scaffolded |
-| Inventory Functional Tests | 1 | ✅ Scaffolded |
-| POS Unit Tests | 0 | ⏳ Phase G |
-| POS Integration Tests | 0 | ⏳ Phase H |
-| Build | All projects | ✅ Succeeded |
-
----
-
-## Tests Passed
-
-- Build: `dotnet build EnterprisePOS.sln` → **Build succeeded**
-- Unit tests: 48 tests pass (FluentAssertions + xUnit + Moq)
-  - 20 Product CRUD tests
-  - 28 Stock/Ledger tests (CreateStock, GetStockById, GetAllStocks, UpdateStock, DeleteStock, StockIn, StockOut, StockTransfer, StockAdjustment)
-- Integration tests: 2 tests scaffolded
-- Functional tests: 1 test scaffolded
-
----
-
-## Tests Failed
-
-None — all 48 unit tests passing
-
----
-
-## Known Problems
-
-1. Docker not available in current environment — cannot verify PostgreSQL container
-2. Integration tests use in-memory database (temporary, will use Respawn + PostgreSQL in CI)
-3. No authentication/authorization implemented yet (Phase B/C)
-4. No stock management yet (Phase E)
-5. `BaseEntity` now auto-generates GUIDs via parameterless constructor
-6. Domain entity constructors validate input using Guard
-
----
-
-## Known Risks
-
-1. Soft-delete query filter applies to all entities — must ensure all domain entities implement `ISoftDeletable`
-2. Multi-tenancy via `tenant_id` column — must ensure all queries filter by tenant (not yet implemented)
-3. In-memory database in integration tests — not suitable for production-like testing
-4. Product CRUD handlers use repository pattern — must ensure all queries go through repository
+Rather than duplicate `git log --stat` here, run:
+```bash
+git log --stat 3939da9^..14bd1d0
+```
+to see every file this session touched, grouped by commit/phase.
 
 ---
 
 ## Remaining Work
 
-- Phase F: POS database foundation
-- Phase G: POS Sales/Checkout foundation
-- Phase H: POS ↔ Inventory integration (RabbitMQ events)
-- Phase I: Daily reporting (scheduled job)
-- Phase J: Observability (OpenTelemetry, Jaeger, Prometheus, Grafana)
-- Phase K: Testing/load testing (k6, NBomber, stress tests)
-- Phase L: Release hardening (auth, rate limiting, security)
+- **Phase K (Testing/Load Testing) — finish it:**
+  - Deeper POS integration tests exercising `SalesController`/`CashSessionsController` end-to-end
+    (needs DB seeding + whatever reset strategy — Respawn or similar — Inventory's fuller integration
+    tests beyond `HealthCheckTests` use; **not yet inspected**, check
+    `services/inventory-service/tests/InventoryService.IntegrationTests/DatabaseMigrationTests.cs` and
+    any other integration tests there first).
+  - Inventory's `LOAD-TESTING.md` mentions an NBomber C# load-testing project
+    (`scripts/load-test/InventoryLoadTest.csproj`) that has never actually existed. Either build it or
+    correct the doc to stop referencing it.
+  - Add a stress-testing pass for POS analogous to `services/inventory-service/docs/STRESS-TESTING.md`
+    (that file was not read this session — check it exists and what it documents before assuming scope).
+
+- **Phase L (Release Hardening) — not started at all:**
+  - Authentication/authorization (JWT). Neither service has any auth today — every endpoint is
+    anonymous. Check ADRs for whether one was planned (ADR-004 covers communication, not auth — may be
+    worth checking if there's an ADR for auth, or writing one).
+  - Rate limiting.
+  - Security review pass (secrets in appsettings.json are dev-only placeholders — `postgres`/`postgres`,
+    `guest`/`guest` — fine for local docker-compose, not for anything else).
+  - CORS is already partially configured (`Cors:AllowedOrigins` in appsettings) — verify it's actually
+    wired into `Program.cs` correctly for both services.
+
+- **Zero-build-warning/error acceptance criterion — cannot be verified in this environment.**
+  The task's hard acceptance criterion (`dotnet build EnterprisePOS.sln` → 0 errors, 0 warnings, all
+  tests passing) has **never been checked against any of this session's work**. This is the single
+  most important thing to do next.
+
+- **Reconcile `docs/ROADMAP.md` against actual state.** It was not updated this session (deprioritized
+  in favor of code + this handover, given the "stop and package" instruction). It still shows Phase F
+  onward as not-started. Update it phase-by-phase against what's listed above.
+
+- **Release notes.** `release-notes/pos-service-v0.1.0.md` was not updated this session either.
 
 ---
 
 ## Next Exact Task
 
-**Phase F: POS Database Foundation**
-
-Create POS database foundation:
-1. POS DbContext with BaseDbContext inheritance
-2. POS domain entities: Store, Register, Cashier, Sale, SaleItem, Payment, Customer
-3. Entity configurations with indexes and foreign keys
-4. EF Core migration for POS schema
-5. Design-time factory for EF Core tools
-6. Unit tests for POS domain entities
-7. Update release notes and handover
-8. Git commit
-
-Do NOT modify: shared/, services/inventory-service/ (Inventory service), existing ADRs, migrations/
-Acceptance: POS DbContext builds, migrations apply, domain entity tests pass
-
----
-
-## Next Recommended Command
+**Step 1 — verify the build, fix what breaks.** This is non-negotiable before anything else:
 
 ```bash
-cd /Users/prince/Downloads/porosh/enterprise-pos-inventory && dotnet build EnterprisePOS.sln
+cd <repo-root>
+dotnet restore EnterprisePOS.sln
+dotnet build EnterprisePOS.sln
 ```
 
+Expect the OpenTelemetry package versions to need adjustment (see Phase J caveat above). Expect the
+RabbitMQ.Client v6.8.1 API calls in `RabbitMqSaleEventPublisher.cs` and `SaleEventsConsumer.cs` to need
+a close check against the actual installed package version — they were written from memory of the v6.x
+API surface (`IModel`, `BasicPublish(exchange, routingKey, mandatory, basicProperties, body)`,
+`EventingBasicConsumer`/`AsyncEventingBasicConsumer`) without a compiler to confirm.
+
+**Step 2 — regenerate the three hand-authored migrations** per the commands in their doc comments (see
+"Migrations that need regeneration" above), then:
+
+```bash
+dotnet ef database update --project services/pos-service/src/PosService.Infrastructure --startup-project services/pos-service/src/PosService.API
+dotnet ef database update --project services/inventory-service/src/InventoryService.Infrastructure --startup-project services/inventory-service/src/InventoryService.API
+```
+
+**Step 3 — run the full test suite** and fix failures:
+
+```bash
+dotnet test EnterprisePOS.sln
+```
+
+**Step 4 — the three isolation scenarios** the original task specified, now that there's something to
+actually test:
+- POS alone (no Inventory, no RabbitMQ) — `docker compose -f services/pos-service/docker-compose.dev.yml up`, hit `/api/v1/sales`, `/api/v1/cash-sessions/open`.
+- Inventory alone — same idea.
+- All three together — complete a POS sale, confirm Inventory's stock decrements via the RabbitMQ event.
+
+**Step 5 — pick up Phase K/L** per "Remaining Work" above.
+
 ---
 
-## Important Architectural Decisions
+## Do NOT
 
-- **Service Boundaries (ADR-001):** Two independent services with separate databases
-- **Clean Architecture + CQRS (ADR-002):** Domain → Application → Infrastructure → API
-- **Provider Abstraction (ADR-003):** PostgreSQL primary, IDbProviderFactory for future providers
-- **Communication (ADR-004):** RabbitMQ async, REST for read queries
-- **Result Pattern (ADR-005):** Result<T> everywhere in Application layer
-- **Multi-tenancy (ADR-006):** Shared DB with tenant_id column, query filters
-- **Observability (ADR-007):** Serilog + Seq + OpenTelemetry + Correlation IDs
+- Don't re-run `dotnet ef migrations add` for POS's `InitialCreate` or Inventory's
+  `AddIntegrationEventInbox`/`AddStockAndStockMovement` without first reading the doc comment on the
+  relevant hand-authored migration — the `--force` flag is required and intentional there.
+- Don't assume `docs/ROADMAP.md` is current — it wasn't touched this session; trust this handover and
+  `git log` over it until it's reconciled.
+- Don't touch `decisions/ADR-*.md` — none needed changing this session; the integration design
+  (optional RabbitMQ, no cross-service DB access) fits ADR-001/ADR-003 as written.
 
 ---
 
-## Environment Requirements
+## Architectural decisions this session made that aren't yet in an ADR
+
+Worth writing up as ADRs (or folding into existing ones) rather than leaving as implicit code decisions:
+
+1. **Sale line items carry a denormalized product snapshot** (`ProductName`/`Sku` at time of sale) and
+   only `ProductId` as a bare reference into Inventory — POS never queries Inventory's database or API
+   synchronously during checkout. The caller (POS terminal UI) is responsible for having already
+   resolved product details before calling `AddSaleItem`.
+2. **RabbitMQ integration is entirely additive and optional**, gated by `RabbitMQ:Host` presence in
+   config on both sides. `NullSaleEventPublisher` is the default; `SaleEventsConsumer` self-disables
+   (logs and returns) if unconfigured, and reconnects with backoff rather than crashing if the broker
+   is unreachable after being configured.
+3. **Stock deduction from a POS sale always targets Inventory's "default" warehouse** (`Warehouse.IsDefault`).
+   There's no per-store-to-per-warehouse mapping — POS doesn't know about Inventory's warehouse concept
+   at all. This is a reasonable default but may not fit a multi-warehouse-per-store retail model; flag
+   for product/architecture review.
+4. **Idempotency for the RabbitMQ consumer** is a simple inbox table (`ProcessedIntegrationEvent`) keyed
+   by `EventId`, not a full outbox pattern on the publisher side. The publisher does not persist
+   outbound events before publishing — a POS process crash between "sale completed" and "event
+   published" would silently lose that one event. Worth a follow-up if stronger delivery guarantees are
+   needed (transactional outbox is the standard fix).
+
+---
+
+## Environment Requirements (unchanged)
 
 - .NET 10 SDK
-- PostgreSQL 16
-- Redis 7
-- RabbitMQ 3.13
+- PostgreSQL 16 (two independent databases: `pos_db`, `inventory_db`)
+- RabbitMQ 3.13 (optional — see above)
 - Docker & Docker Compose
-- Seq (optional, for log querying)
-- k6 (for load testing)
-- Jaeger (for distributed tracing)
-- Prometheus + Grafana (for metrics)
+- k6 (load testing)
+- An OTLP collector (Jaeger or similar) + Prometheus + Grafana (optional, observability)
 
 ---
 
-## Commands Already Executed
-
-```bash
-dotnet build EnterprisePOS.sln  # ✅ Build succeeded
-dotnet ef migrations add InitialCreate --project services/inventory-service/src/InventoryService.Infrastructure --startup-project services/inventory-service/src/InventoryService.API --output-dir Migrations
-dotnet ef migrations add SeedInitialData --project services/inventory-service/src/InventoryService.Infrastructure --startup-project services/inventory-service/src/InventoryService.API --output-dir Migrations
-docker compose -f services/inventory-service/docker-compose.dev.yml up -d postgres  # ❌ Docker not available
-```
-
----
-
-## Commands That Must Be Executed Next
-
-```bash
-# Verify build
-dotnet build EnterprisePOS.sln
-
-# Apply migrations (when PostgreSQL available)
-dotnet ef database update \
-  --project services/inventory-service/src/InventoryService.Infrastructure \
-  --startup-project services/inventory-service/src/InventoryService.API
-
-# Run tests
-dotnet test services/inventory-service/tests/InventoryService.UnitTests/InventoryService.UnitTests.csproj
-dotnet test services/inventory-service/tests/InventoryService.IntegrationTests/InventoryService.IntegrationTests.csproj
-dotnet test services/inventory-service/tests/InventoryService.FunctionalTests/InventoryService.FunctionalTests.csproj
-```
-
----
-
-## Git Status
+## Full commit history (this session)
 
 ```
-On branch main
-Your branch is up to date with 'origin/main'.
-
-Changes not staged for commit:
-  (use "git add <file>..." to update what will be committed)
-	modified:   .DS_Store
+3939da9 fix(shared): wire up MediatR handler discovery and DbContext DI registration
+ffdb2b0 feat(pos): implement database foundation
+8946c8c feat(pos): implement sales checkout flow
+079fd49 feat(integration): implement POS-to-Inventory stock sync over RabbitMQ
+c013e79 feat(pos): implement daily sales reporting job
+1a20b68 feat(observability): add distributed tracing, metrics, correlation IDs, and query logging
+14bd1d0 test(load): add k6 load test scripts and POS integration test scaffold
 ```
 
-Untracked files: All Phase C + Phase D files (entities, migrations, tests, documentation, Product CRUD)
-
----
-
-## Recommended Commit
-
-```bash
-git add -A
-git commit -m "feat(inventory): implement product catalog CRUD
-
-Phase D: Inventory Product/Catalog CRUD
-- Create Product CRUD: CreateProduct, GetProductById, GetAllProducts, UpdateProduct, DeleteProduct
-- Create ProductsController with full CRUD endpoints
-- Add IProductRepository interface + ProductRepository implementation
-- Add FluentValidation validators for all commands/queries
-- Add unit tests for Product CRUD handlers (20 tests total)
-- Add integration tests for Product endpoints
-- Fix BaseEntity constructor to auto-generate GUIDs
-- Fix domain entity constructors to validate input
-- Update release notes and handover
-
-Architecture: Clean Architecture + CQRS + Vertical Slice + Repository Pattern
-```
-
----
-
-## NEXT AGENT COMMAND
-
-```
-Read these files first:
-- handover/ai-handover.md (this file)
-- decisions/ADR-001 through ADR-007
-- services/inventory-service/docs/DATABASE.md (for reference patterns)
-- services/inventory-service/docs/PROGRAMMERS-GUIDE.md
-- docs/ROADMAP.md
-
-Continue from Phase F: POS Database Foundation.
-
-Do NOT modify:
-- shared/shared-kernel/ (kernel)
-- shared/shared-infrastructure/ (infrastructure)
-- services/inventory-service/ (Inventory service — already complete)
-- Existing ADRs (decisions/)
-- Existing migrations (services/inventory-service/src/InventoryService.Infrastructure/Migrations/)
-
-What to do:
-1. Fix any build errors first (run: dotnet build EnterprisePOS.sln)
-2. Create POS DbContext inheriting from BaseDbContext
-3. Create POS domain entities: Store, Register, Cashier, Sale, SaleItem, Payment, Customer
-4. Create entity configurations with indexes and foreign keys
-5. Create EF Core migration for POS schema
-6. Create design-time factory for EF Core tools
-7. Add unit tests for POS domain entities
-8. Update release-notes/pos-service-v0.1.0.md
-9. Update this handover document
-10. Git commit: feat(pos): implement database foundation
-
-Acceptance criteria:
-- dotnet build EnterprisePOS.sln succeeds
-- All unit tests pass
-- POS migration applies successfully
-- Documentation updated
-```
+Read each commit's full message (`git show --stat <sha>` / `git log -1 <sha>`) for the detailed
+per-commit rationale — they were written to be as informative as this document.
