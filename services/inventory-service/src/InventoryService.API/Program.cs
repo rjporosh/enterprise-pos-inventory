@@ -13,6 +13,7 @@ global using System.Text.Json;
 global using SharedKernel;
 global using FluentValidation;
 global using Serilog;
+global using InventoryService.Infrastructure.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,6 +54,11 @@ builder.Services.AddScoped(sp =>
 
 builder.Services.AddScoped<InventoryService.Application.Products.Repositories.IProductRepository, InventoryService.Infrastructure.Repositories.ProductRepository>();
 builder.Services.AddScoped<global::InventoryService.Application.Stock.IStockRepository, InventoryService.Infrastructure.Repositories.StockRepository>();
+
+// Optional POS integration: consumes Sale events over RabbitMQ if configured (see RabbitMQ:Host in
+// appsettings). Inventory's own API and database remain fully functional if this is absent or the
+// broker is unreachable — see SaleEventsConsumer.
+builder.Services.AddInventoryMessaging(builder.Configuration);
 
 builder.Services.AddResponseCaching();
 builder.Services.AddHttpContextAccessor();

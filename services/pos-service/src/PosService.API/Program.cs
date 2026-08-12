@@ -13,6 +13,7 @@ global using System.Text.Json;
 global using SharedKernel;
 global using FluentValidation;
 global using Serilog;
+global using PosService.Infrastructure.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,8 +40,30 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
-builder.Services.AddSharedInfrastructure();
+builder.Services.AddSharedInfrastructure(typeof(PosService.Application.Sales.CreateSale.CreateSaleCommand).Assembly);
 builder.Services.AddDatabaseProvider(builder.Configuration);
+
+builder.Services.AddScoped(sp =>
+{
+    var dbContextFactory = sp.GetRequiredService<IDbContextFactory>();
+    var connectionString = builder.Configuration["Database:ConnectionString"]
+        ?? throw new InvalidOperationException("Database:ConnectionString is not configured.");
+    var options = dbContextFactory.CreateOptions<PosService.Infrastructure.Persistence.PosDbContext>(connectionString);
+    return new PosService.Infrastructure.Persistence.PosDbContext(options);
+});
+
+builder.Services.AddScoped<PosService.Application.Stores.IStoreRepository, PosService.Infrastructure.Repositories.StoreRepository>();
+builder.Services.AddScoped<PosService.Application.Cashiers.ICashierRepository, PosService.Infrastructure.Repositories.CashierRepository>();
+builder.Services.AddScoped<PosService.Application.Registers.ICashRegisterRepository, PosService.Infrastructure.Repositories.CashRegisterRepository>();
+builder.Services.AddScoped<PosService.Application.Registers.ICashSessionRepository, PosService.Infrastructure.Repositories.CashSessionRepository>();
+builder.Services.AddScoped<PosService.Application.Customers.ICustomerRepository, PosService.Infrastructure.Repositories.CustomerRepository>();
+builder.Services.AddScoped<PosService.Application.Sales.Repositories.ISaleRepository, PosService.Infrastructure.Repositories.SaleRepository>();
+
+// No message broker is registered by default so POS's own checkout flow never hard-depends on RabbitMQ
+// (PRIMARY GOAL: RabbitMQ must not become mandatory for either service's independent core functionality).
+// AddPosMessaging(builder.Configuration) below only overrides this with a real publisher when configured.
+builder.Services.AddScoped<PosService.Application.Sales.Events.ISaleEventPublisher, PosService.Application.Sales.Events.NullSaleEventPublisher>();
+builder.Services.AddPosMessaging(builder.Configuration);
 
 builder.Services.AddResponseCaching();
 builder.Services.AddHttpContextAccessor();

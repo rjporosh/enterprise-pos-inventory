@@ -1,4 +1,5 @@
 using InventoryService.Domain.Catalog;
+using InventoryService.Domain.Integration;
 using InventoryService.Domain.Products;
 using InventoryService.Domain.Stock;
 using InventoryService.Domain.Suppliers;
@@ -20,6 +21,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<Stock> Stocks => Set<Stock>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
