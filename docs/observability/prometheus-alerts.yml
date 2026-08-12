@@ -1,0 +1,43 @@
+groups:
+  - name: enterprise-pos-inventory.rules
+    rules:
+      - alert: HighHttpErrorRate
+        expr: |
+          sum by (service) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+          /
+          sum by (service) (rate(http_server_request_duration_seconds_count[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} 5xx error rate above 5% for 5m"
+          description: "Check recent deploys and downstream dependency health (Postgres, RabbitMQ)."
+
+      - alert: HighRequestLatencyP99
+        expr: |
+          histogram_quantile(0.99, sum by (service, le) (rate(http_server_request_duration_seconds_bucket[5m]))) > 1.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} p99 latency above 1.5s for 5m"
+
+      - alert: ServiceDown
+        expr: up{job=~"pos-service|inventory-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is not responding to /metrics scrapes"
+
+      # Informational only: neither service depends on RabbitMQ for its own core functionality
+      # (see ADR-001 / roadmap PRIMARY GOAL), so this is a warning, not a critical page.
+      - alert: PosRabbitMqPublishFailuresElevated
+        expr: increase(pos_sale_event_publish_failures_total[15m]) > 10
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "POS is failing to publish Sale integration events; checkout itself is unaffected"
+          description: "Inventory stock levels will drift from POS sales until RabbitMQ connectivity is restored. Requires a custom counter metric (not yet instrumented — see handover)."

@@ -11,7 +11,7 @@ public interface IDbProviderFactory
     string ProviderName { get; }
 }
 
-public class PostgreSqlProviderFactory : IDbProviderFactory
+public class PostgreSqlProviderFactory(bool enableQueryLogging = false) : IDbProviderFactory
 {
     public string ProviderName => "PostgreSQL";
 
@@ -24,6 +24,18 @@ public class PostgreSqlProviderFactory : IDbProviderFactory
                 maxRetryDelay: TimeSpan.FromSeconds(30),
                 errorCodesToAdd: null);
         });
+
+        if (enableQueryLogging)
+        {
+            // Routed through Serilog's static Log.Logger (already configured with service/environment
+            // enrichment by SerilogConfiguration) rather than threading ILoggerFactory through
+            // IDbContextFactory, since DbContext instances here are constructed outside normal DI
+            // activation (see Program.cs's AddScoped(sp => new PosDbContext(options)) pattern).
+            builder.LogTo(
+                message => Serilog.Log.Logger.Information("{EfQuery}", message),
+                new[] { Microsoft.EntityFrameworkCore.Diagnostics.DbLoggerCategory.Database.Command.Name },
+                Microsoft.Extensions.Logging.LogLevel.Information);
+        }
 
         return builder;
     }
@@ -56,13 +68,14 @@ public static class DbContextServiceCollectionExtensions
     public static IServiceCollection AddDatabaseProvider(this IServiceCollection services, IConfiguration configuration, string providerKey = "Database:Provider")
     {
         var providerName = configuration[providerKey] ?? "PostgreSQL";
+        var enableQueryLogging = bool.TryParse(configuration["Database:EnableQueryLogging"], out var queryLoggingFlag) && queryLoggingFlag;
 
         IDbProviderFactory providerFactory = providerName.ToLowerInvariant() switch
         {
             "sqlserver" => throw new NotImplementedException("SQL Server provider not yet implemented. Use PostgreSQL."),
             "mysql" => throw new NotImplementedException("MySQL provider not yet implemented. Use PostgreSQL."),
             "oracle" => throw new NotImplementedException("Oracle provider not yet implemented. Use PostgreSQL."),
-            _ => new PostgreSqlProviderFactory()
+            _ => new PostgreSqlProviderFactory(enableQueryLogging)
         };
 
         services.AddSingleton(providerFactory);

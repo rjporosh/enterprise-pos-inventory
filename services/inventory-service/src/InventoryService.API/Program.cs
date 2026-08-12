@@ -6,6 +6,7 @@ global using Microsoft.Extensions.Hosting;
 global using Scalar.AspNetCore;
 global using SharedInfrastructure.Logging;
 global using SharedInfrastructure;
+global using SharedInfrastructure.Observability;
 global using SharedInfrastructure.Persistence;
 global using Microsoft.EntityFrameworkCore;
 global using Microsoft.AspNetCore.Http;
@@ -21,6 +22,8 @@ var serviceName = builder.Configuration["ServiceName"] ?? "inventory-service";
 var environment = builder.Environment.EnvironmentName;
 var logger = SerilogConfiguration.CreateLogger(serviceName, environment);
 builder.Host.UseSerilog(logger);
+
+builder.Services.AddObservability(serviceName, builder.Configuration);
 
 var servicesConfig = builder.Configuration.GetSection("Services");
 builder.Services.AddHealthChecks()
@@ -88,6 +91,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 
+app.UseMiddleware<SharedInfrastructure.Observability.CorrelationIdMiddleware>();
+
 app.UseMiddleware<InventoryService.API.Middleware.GlobalExceptionHandler>();
 
 app.UseCors("Default");
@@ -99,6 +104,7 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
+app.MapPrometheusScrapingEndpoint();
 app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = r => r.Tags.Contains("live")
