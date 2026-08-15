@@ -33,7 +33,7 @@ public class PostgreSqlProviderFactory(bool enableQueryLogging = false) : IDbPro
             // activation (see Program.cs's AddScoped(sp => new PosDbContext(options)) pattern).
             builder.LogTo(
                 message => Serilog.Log.Logger.Information("{EfQuery}", message),
-                new[] { Microsoft.EntityFrameworkCore.Diagnostics.DbLoggerCategory.Database.Command.Name },
+                new[] { Microsoft.EntityFrameworkCore.DbLoggerCategory.Database.Command.Name },
                 Microsoft.Extensions.Logging.LogLevel.Information);
         }
 

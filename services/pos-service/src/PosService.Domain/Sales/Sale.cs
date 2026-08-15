@@ -4,6 +4,7 @@ using PosService.Domain.Customers;
 using PosService.Domain.Registers;
 using PosService.Domain.Stores;
 using SharedKernel;
+using BaseEntity = PosService.Domain.Common.BaseEntity;
 
 namespace PosService.Domain.Sales;
 

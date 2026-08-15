@@ -1,6 +1,7 @@
 using PosService.Domain.Cashiers;
 using PosService.Domain.Common;
 using SharedKernel;
+using BaseEntity = PosService.Domain.Common.BaseEntity;
 
 namespace PosService.Domain.Registers;
 

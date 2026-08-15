@@ -1,5 +1,6 @@
 using PosService.Domain.Common;
 using SharedKernel;
+using BaseEntity = PosService.Domain.Common.BaseEntity;
 
 namespace PosService.Domain.Stores;
 
