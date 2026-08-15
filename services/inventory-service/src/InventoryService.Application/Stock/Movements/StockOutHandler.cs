@@ -58,7 +58,7 @@ public class StockOutHandler(
         logger.LogInformation("Stock Out: {Quantity} units of product {ProductId} from warehouse {WarehouseId}. New balance: {Balance}",
             command.Quantity, command.ProductId, command.WarehouseId, newBalance);
 
-        return ToDto(saved, savedMovement);
+        return ToDto(saved!, savedMovement);
     }
 
     private static StockMovementDto ToDto(global::InventoryService.Domain.Stock.Stock stock, global::InventoryService.Domain.Stock.StockMovement movement) => new(

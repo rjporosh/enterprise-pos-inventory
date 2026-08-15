@@ -58,6 +58,8 @@ public class GetAllStocksHandler(
 
         var totalCount = items.Count;
 
+        logger.LogInformation("Retrieved {Count} stock records (query: OutOfStock={OutOfStock}, LowStock={LowStock})", totalCount, query.OutOfStock, query.LowStock);
+
         var sortByLower = query.SortBy?.ToLower() ?? "productname";
         var sorted = sortByLower switch
         {

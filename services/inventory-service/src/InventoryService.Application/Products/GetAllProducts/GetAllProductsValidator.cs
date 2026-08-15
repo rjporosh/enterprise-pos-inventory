@@ -15,7 +15,7 @@ public class GetAllProductsValidator : AbstractValidator<GetAllProductsQuery>
             .LessThanOrEqualTo(100).WithMessage("Page size cannot exceed 100.");
 
         RuleFor(x => x.SortBy)
-            .Must(sortBy => new[] { "name", "sku", "price", "createdat" }.Contains(sortBy.ToLower()))
+            .Must(sortBy => new[] { "name", "sku", "price", "createdat" }.Contains(sortBy!.ToLower()))
             .WithMessage("SortBy must be one of: name, sku, price, createdat.")
             .When(x => !string.IsNullOrWhiteSpace(x.SortBy));
     }

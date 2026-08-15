@@ -19,7 +19,7 @@ public class GetAllProductsHandler(
             query.BrandId,
             query.IsActive,
             query.SearchTerm,
-            query.SortBy,
+            query.SortBy ?? "name",
             query.SortDescending,
             ct);
 
