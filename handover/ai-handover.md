@@ -1,8 +1,8 @@
 # AI Handover — Enterprise POS & Inventory Backend
 
-**Last Updated:** 2026-08-16T00:00:00+00:00
+**Last Updated:** 2026-08-16T01:00:00+00:00
 **Current Branch:** main
-**Last Commit:** 18d84c0 fix(build): resolve all 71 build errors + 30 warnings reported by dotnet build
+**Last Commit:** 0a48145 fix(build): resolve remaining 2 errors + 6 warnings from second build pass
 
 ---
 
@@ -67,13 +67,30 @@ dotnet restore EnterprisePOS.sln
 dotnet build EnterprisePOS.sln
 ```
 
-**If this comes back 0 errors / 0 warnings for both services:** update this doc's "Next Exact Task"
-section to strike through Step 1, then proceed straight to Step 2 (migrations) and beyond.
+**Update — user re-ran the build and confirmed 71/30 → 2/6.** Both services' Domain/Application/
+Infrastructure/API layers compiled clean, plus InventoryService's full test suite. Two remaining issues,
+fixed in commit `0a48145`:
 
-**If new errors appear:** they are new information, not a sign the above fixes were wrong — paste the
-exact output (same as this session) rather than re-deriving from scratch. Fix each precisely, the same
-way: read the actual error, find the actual root cause in the actual file, make the smallest fix, don't
-touch anything not implicated by the error.
+| # | Errors/Warnings | File(s) | Root cause | Fix |
+|---|---|---|---|---|
+| 6 | 2 errors (CS0234/CS0246) | `PosService.IntegrationTests.csproj` | Missing `Microsoft.AspNetCore.Mvc.Testing` package reference — this is what `WebApplicationFactory<>` comes from. `InventoryService.IntegrationTests.csproj` already had it; POS's equivalent never did | Added `<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />` (same version Inventory's test project already uses) |
+| 7 | 6 warnings (nullable/unused, `InventoryService.Application`) | `GetAllProductsHandler.cs`, `GetAllProductsValidator.cs`, `GetAllStocksHandler.cs`, `StockOutHandler.cs`, `StockInHandler.cs`, `StockAdjustmentHandler.cs` | Pre-existing nullable-reference and unused-parameter warnings, unrelated to the OpenTelemetry/DI fixes above — these are genuine (if minor) code issues that were always there, just never surfaced because the build never got that far before | `query.SortBy ?? "name"` at the one call site (matches the query's own default); null-forgiving `sortBy!` inside a `.Must()` lambda already guarded by `.When(!IsNullOrWhiteSpace(...))` that the compiler can't trace across; `logger` in `GetAllStocksHandler` was genuinely never used — added a real `LogInformation` call matching the sibling `GetAllProductsHandler`'s pattern, rather than deleting the parameter; `saved!` in all 3 stock-movement handlers where `saved` is provably non-null whenever `savedMovement` is non-null (same ternary-guard pattern in each), but the compiler can't trace it |
+
+**Both services are now expected to build with 0 errors, 0 warnings.** This has not yet been confirmed
+by a third build run — that's the very next step for whoever picks this up next.
+
+### Exact command to verify this second fix
+
+```bash
+cd <repo-root>
+dotnet restore EnterprisePOS.sln
+dotnet build EnterprisePOS.sln
+```
+
+If this comes back 0/0 for real: **cross off Step 1 in "Next Exact Task" below and move straight to
+Step 2** (regenerating the 3 hand-authored migrations). If new errors/warnings appear, they're new
+information — same method as both passes above: paste exact output, fix precisely, don't touch anything
+not implicated.
 
 ---
 
@@ -214,7 +231,7 @@ to see every file this session touched, grouped by commit/phase.
 
 ## Next Exact Task
 
-**Step 1 — re-verify the build now that the 71 errors / 30 warnings from 2026-08-16 are fixed:**
+**Step 1 — confirm 0 errors / 0 warnings with a third build run:**
 
 ```bash
 cd <repo-root>
@@ -222,12 +239,10 @@ dotnet restore EnterprisePOS.sln
 dotnet build EnterprisePOS.sln
 ```
 
-Both `InventoryService` and `PosService` (all projects: Domain, Application, Infrastructure, API, and all
-three test projects for each) must come back **0 errors, 0 warnings** for this step to be done. If it
-does, cross this step off and move to Step 2. If it doesn't — new errors are expected to be a much
-smaller, more targeted set now that the two structural issues (missing ProjectReference, ambiguous
-BaseEntity) are gone — paste the exact output and fix precisely, the same way the 2026-08-16 session did
-(see "This session" section above for the method, not just the fixes).
+Two fix passes have run against real `dotnet build` output so far (71/30 → 2/6 → fixes applied,
+unconfirmed). This step is just re-running the build to confirm the second pass actually worked — if it
+comes back 0/0, cross this step off and move to Step 2. If not, paste the output and fix precisely, same
+method as both passes above.
 
 **Step 2 — regenerate the three hand-authored migrations** per the commands in their doc comments (see
 "Migrations that need regeneration" above), then:
