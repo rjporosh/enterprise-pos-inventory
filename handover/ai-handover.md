@@ -249,6 +249,11 @@ method as both passes above.
 
 ```bash
 dotnet ef database update --project services/pos-service/src/PosService.Infrastructure --startup-project services/pos-service/src/PosService.API
+
+dotnet ef migrations add AddInventoryChanges \
+  --project services/inventory-service/src/InventoryService.Infrastructure \
+  --startup-project services/inventory-service/src/InventoryService.API
+
 dotnet ef database update --project services/inventory-service/src/InventoryService.Infrastructure --startup-project services/inventory-service/src/InventoryService.API
 ```
 
