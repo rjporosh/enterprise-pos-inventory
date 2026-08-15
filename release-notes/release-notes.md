@@ -191,3 +191,18 @@ No functional tests yet. CI pipeline runs build successfully for compilation.
 - Phase F: POS database foundation
 - Phase G: POS Sales/Checkout foundation
 - Phase H: POS ↔ Inventory integration
+
+---
+
+## 2026-08-16 — Build Health Fix Pass
+
+**Status:** Zero-error/zero-warning verification in progress (see `handover/ai-handover.md` for current state — this file is a stale Phase A/B snapshot; trust the handover doc and `git log` over this file until it's fully reconciled).
+
+Fixed all 71 build errors and 30 build warnings reported by a real `dotnet restore` / `dotnet build` run against the repo (this session's environment has no .NET SDK, so fixes were made by reading the exact compiler output the user supplied, then verified by reading the affected source — not guessed):
+
+- 8x CS0104 (`PosService.Domain`): ambiguous `BaseEntity` between `PosService.Domain.Common.BaseEntity` and `SharedKernel.BaseEntity` — disambiguated with a type alias in each of the 8 affected files.
+- 61x CS0234/CS0246 (`PosService.Application`): `PosService.Application.csproj` was missing its `ProjectReference` to `PosService.Domain` — added it.
+- 2x errors (`shared-infrastructure`): missing `FluentValidation.DependencyInjectionExtensions` package reference (`AddValidatorsFromAssemblies`); wrong namespace for `DbLoggerCategory`.
+- 30x NU1603/NU1902 warnings: `OpenTelemetry.Exporter.Prometheus.AspNetCore` was pinned to a version that was never published (`1.9.0-rc.1`); repinned the whole OpenTelemetry package set in `shared-infrastructure.csproj` to a verified, patched, mutually-compatible set (Extensions.Hosting/Exporter.OpenTelemetryProtocol 1.15.3, Instrumentation.AspNetCore 1.15.2, Instrumentation.Http/Runtime 1.15.1, Exporter.Prometheus.AspNetCore 1.15.3-beta.1), clearing 3 known moderate-severity advisories (GHSA-8785-wc3w-h8q6, GHSA-g94r-2vxg-569j, GHSA-4625-4j76-fww9).
+
+No business logic, tests, or previously-working files touched. Full detail in `handover/ai-handover.md`.

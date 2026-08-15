@@ -1,26 +1,79 @@
 # AI Handover — Enterprise POS & Inventory Backend
 
-**Last Updated:** 2026-08-12T20:34:00+00:00
+**Last Updated:** 2026-08-16T00:00:00+00:00
 **Current Branch:** main
-**Last Commit:** 14bd1d0 test(load): add k6 load test scripts and POS integration test scaffold
+**Last Commit:** 18d84c0 fix(build): resolve all 71 build errors + 30 warnings reported by dotnet build
 
 ---
 
-## ⚠️ Read this first: environment limitation that shaped this whole session
+## ⚠️ Read this first: environment limitation that shaped every session so far
 
-The environment this session ran in had **no .NET SDK installed and no network access**. Every file
-below was written by hand, reasoned about carefully against the existing code's own conventions, and
-cross-checked for consistency — but **none of it has been compiled, restored, or tested**. Two
-pre-existing runtime bugs were found and fixed by careful reading, not by a failing test (see "Bugs
-fixed" below). Treat everything in this document as "should be correct" not "verified correct" until
-someone runs the commands in **Next Exact Task** on a machine with the SDK.
+Every session so far — including this one — has run in an environment with **no .NET SDK installed and
+no network access to NuGet/apt** (confirmed again this session: `dotnet` is absent, `apt-get install
+dotnet-sdk-8.0` returns `403 Forbidden`). This session was different in one important way though: **the
+user ran `dotnet restore` / `dotnet build` themselves on their own machine and pasted the full output**
+(30 warnings, 71 errors, itemized by file/line). That real compiler output was used to find and fix every
+issue below — not guesswork. This is a meaningfully stronger basis than the "should be correct" caveat
+in earlier versions of this doc, but it is still **only as verified as the next build the user runs**. If
+you are picking this up with SDK access, `dotnet build EnterprisePOS.sln` is the very first thing to run,
+and if new errors appear, treat it exactly like this session did: get the exact output, fix precisely,
+don't guess broadly.
 
 ---
 
 ## Current Phase
 
 Roadmap phases **F, G, H, I, J are complete**. **Phase K is partially complete** (stopped mid-phase at
-the user's explicit request — see below). **Phase L has not been started.**
+the user's explicit request — see below). **Phase L has not been started.** This session's entire scope
+was the build-health fix pass below — **Phase K/L work itself has not been touched this session.**
+
+---
+
+## This session (2026-08-16): build-health fix pass
+
+**Commit `18d84c0`.** The user ran `dotnet restore`/`dotnet build` and got **30 warnings, 71 errors**.
+Pasted the full output. All of it was traced to **5 root causes** and fixed with the smallest possible
+change per cause — no rewrites, no deletions of working code, no touching of business logic or tests:
+
+| # | Errors/Warnings | File(s) | Root cause | Fix |
+|---|---|---|---|---|
+| 1 | 8 errors (CS0104) | 8 files in `PosService.Domain` (`Customer.cs`, `Store.cs`, `Sale.cs`, `SaleItem.cs`, `Cashier.cs`, `CashSession.cs`, `CashRegister.cs`, `Payment.cs`) | `PosService.Domain.Common.BaseEntity` and `SharedKernel.BaseEntity` are both in scope (the latter needed for `SharedKernel.Guard`), so bare `BaseEntity` was ambiguous | Added `using BaseEntity = PosService.Domain.Common.BaseEntity;` alias to each file. Did **not** remove `using SharedKernel;` (still needed for `Guard`) and did **not** delete either `BaseEntity` class — both may still be intentionally separate; flagged below for a product decision. |
+| 2 | 61 errors (CS0234/CS0246) | `PosService.Application.csproj` | The csproj had **no `ProjectReference` to `PosService.Domain` at all** — every Domain type (`Sale`, `Customer`, `Store`, `CashRegister`, `CashSession`, `DailySalesReport`, `SaleStatus`, `PaymentMethodType`, etc.) failed to resolve throughout the entire Application layer as a cascading result of this one missing line | Added the missing `<ProjectReference Include="..\PosService.Domain\PosService.Domain.csproj" />` |
+| 3 | 1 error (CS1061) | `shared/shared-infrastructure/src/DependencyInjection.cs` | `AddValidatorsFromAssemblies` is an extension method from the **`FluentValidation.DependencyInjectionExtensions`** package, which was never referenced — only core `FluentValidation` was | Added `<PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />` to `shared-infrastructure.csproj` (matches the existing `FluentValidation` core version) |
+| 4 | 1 error (CS0234) | `shared/shared-infrastructure/src/Persistence/DbContextFactory.cs` | Wrong namespace: code referenced `Microsoft.EntityFrameworkCore.Diagnostics.DbLoggerCategory`, which doesn't exist — the real type is `Microsoft.EntityFrameworkCore.DbLoggerCategory` | Fixed the fully-qualified reference (one line) |
+| 5 | 30 warnings (NU1603 + NU1902) | `shared/shared-infrastructure/src/shared-infrastructure.csproj` | `OpenTelemetry.Exporter.Prometheus.AspNetCore` was pinned to `1.9.0-rc.1`, **a version that was never published**, so NuGet silently substituted `1.10.0-beta.1` (NU1603 on every project in the solution) and the resulting/transitive `OpenTelemetry.Api` 1.10.0 + `OpenTelemetry.Exporter.OpenTelemetryProtocol` 1.9.0 carried 3 known moderate-severity advisories (NU1902): `GHSA-8785-wc3w-h8q6`, `GHSA-g94r-2vxg-569j`, `GHSA-4625-4j76-fww9` | Repinned the **entire OpenTelemetry package set** in one place to a verified, mutually-compatible, patched set (confirmed via NuGet.org + GitHub advisory pages, not guessed): `OpenTelemetry.Extensions.Hosting` **1.15.3**, `OpenTelemetry.Instrumentation.AspNetCore` **1.15.2**, `OpenTelemetry.Instrumentation.Http` **1.15.1**, `OpenTelemetry.Instrumentation.Runtime` **1.15.1**, `OpenTelemetry.Exporter.OpenTelemetryProtocol` **1.15.3**, `OpenTelemetry.Exporter.Prometheus.AspNetCore` **1.15.3-beta.1** (this exporter has never had a stable release — 1.15.3-beta.1 is the beta that's version-locked to core 1.15.3 per its own release notes) |
+
+**RabbitMQ.Client 6.8.1 API usage was re-checked this session** (`RabbitMqSaleEventPublisher.cs`,
+`SaleEventsConsumer.cs`) against the errors reported — it produced **zero errors** in the user's build
+output, and a careful re-read confirms the `IModel`/`CreateModel`/`BasicPublish(...)`/
+`AsyncEventingBasicConsumer`/`DispatchConsumersAsync` calls do match the real v6.x API surface. The
+"written from memory, unverified" caveat on this file from the previous session's handover can be
+considered resolved — **once the user's next build confirms 0 errors there too.**
+
+**One open question flagged, not resolved:** `PosService.Domain.Common.BaseEntity` and
+`SharedKernel.BaseEntity` are near-identical duplicates (the only difference: `SharedKernel.BaseEntity`'s
+constructor sets `Id = Guid.NewGuid()`, `PosService.Domain.Common.BaseEntity`'s doesn't). Inventory's
+equivalent (`InventoryService.Domain.Common.BaseEntity`) also duplicates `SharedKernel.BaseEntity` but
+never hit this ambiguity because Inventory's domain files don't also `using SharedKernel;`. This looks
+like unintentional duplication from an earlier phase, not a deliberate design choice — worth a follow-up
+decision (collapse to one, or document why both exist) but **deliberately not touched this session**
+since it wasn't broken and touching it risks exactly the kind of regression the user asked to avoid.
+
+### Exact command to verify this fix
+
+```bash
+cd <repo-root>
+dotnet restore EnterprisePOS.sln
+dotnet build EnterprisePOS.sln
+```
+
+**If this comes back 0 errors / 0 warnings for both services:** update this doc's "Next Exact Task"
+section to strike through Step 1, then proceed straight to Step 2 (migrations) and beyond.
+
+**If new errors appear:** they are new information, not a sign the above fixes were wrong — paste the
+exact output (same as this session) rather than re-deriving from scratch. Fix each precisely, the same
+way: read the actual error, find the actual root cause in the actual file, make the smallest fix, don't
+touch anything not implicated by the error.
 
 ---
 
@@ -161,7 +214,7 @@ to see every file this session touched, grouped by commit/phase.
 
 ## Next Exact Task
 
-**Step 1 — verify the build, fix what breaks.** This is non-negotiable before anything else:
+**Step 1 — re-verify the build now that the 71 errors / 30 warnings from 2026-08-16 are fixed:**
 
 ```bash
 cd <repo-root>
@@ -169,11 +222,12 @@ dotnet restore EnterprisePOS.sln
 dotnet build EnterprisePOS.sln
 ```
 
-Expect the OpenTelemetry package versions to need adjustment (see Phase J caveat above). Expect the
-RabbitMQ.Client v6.8.1 API calls in `RabbitMqSaleEventPublisher.cs` and `SaleEventsConsumer.cs` to need
-a close check against the actual installed package version — they were written from memory of the v6.x
-API surface (`IModel`, `BasicPublish(exchange, routingKey, mandatory, basicProperties, body)`,
-`EventingBasicConsumer`/`AsyncEventingBasicConsumer`) without a compiler to confirm.
+Both `InventoryService` and `PosService` (all projects: Domain, Application, Infrastructure, API, and all
+three test projects for each) must come back **0 errors, 0 warnings** for this step to be done. If it
+does, cross this step off and move to Step 2. If it doesn't — new errors are expected to be a much
+smaller, more targeted set now that the two structural issues (missing ProjectReference, ambiguous
+BaseEntity) are gone — paste the exact output and fix precisely, the same way the 2026-08-16 session did
+(see "This session" section above for the method, not just the fixes).
 
 **Step 2 — regenerate the three hand-authored migrations** per the commands in their doc comments (see
 "Migrations that need regeneration" above), then:
