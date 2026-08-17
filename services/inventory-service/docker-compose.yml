@@ -1,0 +1,75 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: inventory-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: inventory_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - inventory-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - inventory-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: inventory-redis
+    restart: always
+    ports:
+      - "6381:6379"
+    volumes:
+      - inventory-redis-data:/data
+    networks:
+      - inventory-network
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: inventory-rabbitmq
+    restart: always
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - inventory-rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - inventory-network
+
+  inventory-api:
+    build:
+      context: ../..
+      dockerfile: services/inventory-service/Dockerfile
+    container_name: inventory-api
+    restart: always
+    ports:
+      - "5002:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=inventory_db;Username=postgres;Password=postgres
+      - Redis__ConnectionString=redis:6379
+      - RabbitMQ__Host=rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - inventory-network
+
+volumes:
+  inventory-db-data:
+  inventory-redis-data:
+  inventory-rabbitmq-data:
+
+networks:
+  inventory-network:
+    driver: bridge

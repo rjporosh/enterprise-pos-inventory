@@ -1,0 +1,44 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  DOTNET_VERSION: 10.0.x
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore EnterprisePOS.sln
+
+      - name: Build
+        run: dotnet build EnterprisePOS.sln --no-restore --configuration Release
+
+      - name: Run Unit Tests
+        run: |
+          dotnet test services/pos-service/tests/PosService.UnitTests/PosService.UnitTests.csproj --no-build --configuration Release --verbosity normal --collect:"Code Coverage"
+          dotnet test services/inventory-service/tests/InventoryService.UnitTests/InventoryService.UnitTests.csproj --no-build --configuration Release --verbosity normal --collect:"Code Coverage"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Check Format
+        run: |
+          dotnet format EnterprisePOS.sln --verify-no-changes --verbosity diagnostic || (echo "Code formatting issues found. Run 'dotnet format'." && exit 1)
