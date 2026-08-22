@@ -1,338 +1,1033 @@
-1. Document Information
-2. Vision
-3. Business Goals
-4. Scope
-5. Functional Requirements
-6. Non Functional Requirements
-7. Technology Stack
-8. Architecture Principles
-9. SaaS Readiness
-10. Security Requirements
-11. Database Standards
-12. Logging Standards
-13. Observability
-14. Testing Strategy
-15. CI/CD Strategy
-16. Documentation Standards
-17. Git Workflow
-18. Coding Standards
-19. AI Development Rules
-20. Milestone Rules
-21. Handover Rules
-22. Release Management
-23. Future Roadmap
-24. Acceptance Criteria
-25. Definition of Done
+# Enterprise POS & Inventory SaaS
+## Master Product & Engineering Specification
 
-----
-# Enterprise POS & Inventory Management System
-## Master Specification (MASTER-SPEC.md)
-
-**Version:** 1.0.0
-
-**Status:** Draft
-
-**Project Type:** Commercial Enterprise SaaS Ready Application
-
-**Document Owner:** Project Architect
-
+**Version:** 2.0.0
+**Status:** Active
+**Product Type:** Commercial Multi-Tenant SaaS
+**Primary Market:** Small and medium retail businesses
+**Architecture:** API-first, multi-tenant, cloud-ready
 **Last Updated:** August 2026
 
 ---
 
-# 1. Purpose
-
-This document defines the complete software specification, engineering standards, architecture principles, business requirements, development workflow, documentation rules, testing strategy, deployment process, AI collaboration rules, and coding standards for the Enterprise POS & Inventory Management System.
-
-This document serves as the single source of truth for all developers, AI assistants, architects, QA engineers, DevOps engineers, and stakeholders.
-
-No implementation should violate this specification unless explicitly approved.
-
----
-
-# 2. Vision
-
-Build a modern, enterprise-grade Point of Sale and Inventory Management platform that is:
-
-- Production Ready
-- Commercially Deployable
-- SaaS Ready
-- Multi-Tenant Ready
-- Cloud Ready
-- API First
-- Mobile Ready
-- AI Friendly
-- Extensible
-- Highly Maintainable
-
-The application should initially support a single retail store but must be designed to scale into a multi-tenant SaaS platform capable of serving thousands of businesses with minimal architectural changes.
-
----
-
-# 3. Project Goals
-
-The system shall:
-
-- Simplify retail operations.
-- Reduce manual inventory management.
-- Automate sales workflows.
-- Track real-time inventory.
-- Generate business reports.
-- Improve operational efficiency.
-- Minimize stock discrepancies.
-- Support barcode-based sales.
-- Generate accurate financial reports.
-- Provide complete audit trails.
-- Enable future online expansion.
-- Support future accounting integration.
-- Support future eCommerce integration.
-- Support future mobile applications.
-- Support future AI-powered business insights.
-
----
-
-# 4. Project Scope
-
-The MVP will support:
-
-- Single Store
-- Single Warehouse
-- Single Currency
-- Single Language
-- Local Deployment
-
-However, the architecture shall be prepared for:
-
-- Multiple Stores
-- Multiple Warehouses
-- Multiple Branches
-- Multiple Companies
-- Multiple Tenants
-- Multiple Languages
-- Multiple Currencies
-- Tax Configuration
-- Subscription Plans
-- White Label Branding
-- Plugin Architecture
-
-without requiring major architectural changes.
-
----
-
-# 5. Business Objectives
-
-The software should enable a business owner to:
-
-- Sell products quickly.
-- Scan barcodes.
-- Print receipts.
-- Track inventory.
-- Manage suppliers.
-- Manage customers.
-- Track purchases.
-- Track expenses.
-- Track profits.
-- Generate reports.
-- Monitor daily sales.
-- Analyze business performance.
-
-The software should reduce manual calculations and eliminate spreadsheet dependency.
-
----
-
-# 6. Target Users
-
-The application shall support the following user roles.
-
-### Administrator
-
-Responsible for complete system administration.
-
-Responsibilities
-
-- User Management
-- Permission Management
-- System Configuration
-- Reports
-- Security
-- Audit Logs
-
----
-
-### Manager
-
-Responsible for daily business operations.
-
-Responsibilities
-
-- Inventory
-- Purchases
-- Sales
-- Reports
-- Employees
-- Expenses
-
----
-
-### Cashier
-
-Responsible for POS operations.
-
-Responsibilities
-
-- Barcode Scan
-- Sales
-- Returns
-- Receipt Printing
-
----
-
-### Inventory Operator
-
-Responsible for inventory movement.
-
-Responsibilities
-
-- Stock In
-- Stock Out
-- Stock Adjustment
-- Stock Verification
-
----
-
-### Accountant
-
-Responsible for financial reporting.
-
-Responsibilities
-
-- Expenses
-- Profit
-- Revenue
-- Financial Reports
-
----
-
-# 7. Business Domain
-
-The system belongs to the Retail Management domain.
-
-Core domains include:
-
-- Sales
-- Inventory
-- Purchasing
-- Finance
-- Customer Management
-- Supplier Management
-- Reporting
-- Analytics
-- Authentication
-- Authorization
-
----
-
-# 8. Success Criteria
-
-The MVP shall be considered successful when:
-
-- A product can be added.
-- Barcode can be generated.
-- Barcode can be scanned.
-- Customer purchase can be completed.
-- Receipt can be printed.
-- Inventory updates automatically.
-- Sales report is generated.
-- Expense report is generated.
-- Profit is calculated.
-- Dashboard reflects real-time data.
-- Application builds successfully.
-- Tests pass.
-- Docker deployment works.
-- Documentation is complete.
-
----
-
-# 9. Non Goals
-
-The following are intentionally excluded from MVP.
-
-- Online Marketplace
-- Mobile Application
-- AI Sales Prediction
-- Customer Loyalty Program
-- Accounting Integration
-- SMS Gateway
-- WhatsApp Integration
-- Payment Gateway
-- Multi-Tenant Deployment
-
-These shall be implemented in future releases.
-
----
-
-# 10. Guiding Principles
-
-Every implementation must follow these principles.
-
-- Keep architecture clean.
-- Keep business logic independent.
-- Avoid unnecessary abstraction.
-- Write readable code.
-- Prefer composition over inheritance.
-- Design for extensibility.
-- Keep APIs versioned.
-- Make every feature testable.
-- Keep documentation synchronized.
-- Never sacrifice maintainability for shortcuts.
-
----
-
-# 11. Engineering Philosophy
-
-The software must prioritize:
-
-- Simplicity
-- Reliability
-- Scalability
-- Security
+# 1. Product Vision
+
+Build a professional commercial Point of Sale and Inventory Management SaaS platform that can be used by real-world retail businesses including:
+
+- Clothing stores
+- Burkha stores
+- Motor-parts stores
+- Electronics stores
+- Grocery/mudi shops
+- Pharmacies
+- General retail stores
+- Small specialty stores
+
+The platform must allow a business to start with one store and later expand into multiple branches.
+
+The system must prioritize:
+
+- Fast checkout
+- Reliable inventory
+- Barcode-based selling
+- Accurate financial records
+- Easy reporting
+- Multi-user operation
+- Multi-branch operation
+- Offline-capable POS
+- Subscription-based SaaS
+- Strong security
+- Auditability
 - Maintainability
-- Performance
-- Observability
-- Testability
-- Extensibility
+- Scalability
 
-Every feature should be implemented as if the software will be maintained for the next ten years.
+The initial production customer will be used as a real-world validation environment.
 
 ---
 
-# 12. Definition of Enterprise Ready
+# 2. Product Strategy
 
-The application shall not be considered enterprise-ready unless it satisfies all of the following:
+The platform shall use a generic retail core instead of creating separate applications for every industry.
 
-- Clean Architecture
-- Vertical Slice Architecture
-- CQRS
-- Dependency Injection
-- Logging
-- Audit Trail
-- Exception Handling
+Core functionality shall be reusable across industries.
+
+Industry-specific capabilities shall be implemented through extensible product attributes/modules.
+
+Examples:
+
+Clothing:
+
+- Size
+- Color
+- Fabric
+- Design
+
+Motor Parts:
+
+- Part Number
+- OEM Number
+- Vehicle Make
+- Vehicle Model
+- Compatibility
+
+Pharmacy:
+
+- Batch
+- Expiry
+- Manufacturer
+- Generic Name
+
+Grocery:
+
+- Unit
+- Weight
+- Quantity
+
+The core architecture must not be tightly coupled to a single industry.
+
+---
+
+# 3. SaaS Architecture
+
+The system shall support:
+
+- Multiple tenants
+- Tenant isolation
+- Multiple stores per tenant
+- Multiple warehouses
+- Multiple registers
+- Multiple users
+- Roles
+- Permissions
+- Subscription plans
+- Licensing
+- Entitlements
+- Trial periods
+- Billing lifecycle
+- Audit logs
+
+A tenant represents an independent business/customer.
+
+All tenant-owned data must be isolated.
+
+Tenant A must never be able to access Tenant B data.
+
+Authorization must be enforced server-side.
+
+---
+
+# 4. Organization Model
+
+The logical hierarchy shall be:
+
+Tenant
+|
++-- Users
++-- Roles
++-- Permissions
+|
++-- Stores
+|   |
+|   +-- Registers
+|   +-- Cash Sessions
+|   +-- Staff
+|
++-- Warehouses
+|
++-- Products
++-- Categories
++-- Brands
++-- Suppliers
++-- Customers
++-- Sales
++-- Returns
++-- Purchases
++-- Expenses
++-- Inventory
++-- Reports
++-- Settings
+
+A tenant may have multiple branches.
+
+Branch-level access must be permission controlled.
+
+---
+
+# 5. Authentication & Authorization
+
+The platform shall support:
+
+- Secure authentication
+- JWT/access-token based API authentication where appropriate
+- Refresh-token/session management
+- Role-based authorization
+- Permission-based authorization
+- Tenant context
+- Branch restrictions
+- Register restrictions
+- Audit logging
+- Account lockout/protection
+- Secure password policies
+- Session revocation
+
+Frontend authorization checks are only UX controls.
+
+Backend authorization is authoritative.
+
+---
+
+# 6. Roles
+
+Initial roles may include:
+
+- Platform Administrator
+- Tenant Owner
+- Tenant Administrator
+- Manager
+- Cashier
+- Inventory Operator
+- Accountant
+
+The permission system must be extensible.
+
+Example permissions:
+
+- product.read
+- product.create
+- product.update
+- product.delete
+- inventory.adjust
+- inventory.transfer
+- sale.create
+- sale.void
+- sale.return
+- report.view
+- user.manage
+- branch.manage
+- settings.manage
+
+---
+
+# 7. Product Management
+
+Products shall support:
+
+- Product name
+- SKU
+- Barcode
+- Product code
+- Category
+- Brand
+- Unit
+- Purchase price
+- Selling price
+- Discount
+- Tax
+- Minimum stock
+- Maximum stock
+- Supplier
+- Product image
+- Active/inactive state
+
+The architecture must support future custom attributes.
+
+Barcode requirements:
+
+- Generate barcode
+- Assign barcode
+- Print barcode labels
+- Search by barcode
+- Scan barcode
+- Validate barcode uniqueness
+- Support common retail barcode formats
+- Support manually entered barcodes
+
+Barcode scanning must be optimized for fast POS operation.
+
+---
+
+# 8. POS
+
+POS must support:
+
+- Product search
+- Barcode scanning
+- Keyboard-friendly workflow
+- Fast product lookup
+- Cart
+- Quantity changes
+- Discounts
+- Taxes
+- Customer selection
+- Hold sale
+- Resume sale
+- Remove item
+- Cancel sale
+- Complete sale
+- Multiple payment methods
+- Cash payment
+- Card payment integration architecture
+- Mobile payment/manual payment methods
+- Change calculation
+- Receipt generation
+- Receipt reprint
+
+POS must prioritize speed and reliability.
+
+---
+
+# 9. Sales
+
+Every completed sale shall record:
+
+- Tenant
+- Store
+- Register
+- Cashier
+- Customer where applicable
+- Sale number
+- Items
+- Quantities
+- Unit prices
+- Discounts
+- Taxes
+- Total
+- Payment methods
+- Payment amounts
+- Timestamp
+- Device information where required
+- Correlation ID
+- Audit information
+
+Financial transactions must be immutable after completion except through controlled correction workflows.
+
+---
+
+# 10. Product Returns & Refunds
+
+Returns are mandatory production functionality.
+
+The system shall support:
+
+- Full sale return
+- Partial sale return
+- Return by receipt
+- Return by sale number
+- Return by product
+- Return quantity validation
+- Return reason
+- Refund amount
+- Refund method
+- Inventory restoration
+- Return history
+- Manager approval where configured
+- Return audit trail
+
+A returned product must not simply modify the original sale.
+
+Instead, create a separate return/refund transaction linked to the original sale.
+
+Example:
+
+Sale:
+
+SALE-1001
+
+Return:
+
+RETURN-2001
+
+Linked to:
+
+SALE-1001
+
+The system must prevent returning more quantity than was originally sold minus already returned quantity.
+
+---
+
+# 11. Inventory
+
+Inventory shall support:
+
+- Stock by warehouse
+- Stock by branch
+- Stock movements
+- Stock ledger
+- Stock adjustment
+- Stock transfer
+- Stock count
+- Stock receiving
+- Stock issue
+- Low stock alerts
+- Out-of-stock alerts
+- Inventory history
+- Inventory reconciliation
+- Inventory valuation where supported
+
+Inventory changes must be auditable.
+
+POS sales must update inventory safely.
+
+Concurrency must prevent overselling where inventory restrictions apply.
+
+---
+
+# 12. Purchasing
+
+Support:
+
+- Suppliers
+- Purchase orders
+- Purchase receiving
+- Purchase items
+- Purchase price
+- Supplier invoice/reference
+- Stock receiving
+- Purchase history
+
+Purchasing shall integrate with inventory.
+
+---
+
+# 13. Customers
+
+Support:
+
+- Customer profile
+- Phone
+- Email where applicable
+- Address
+- Purchase history
+- Returns
+- Outstanding balances where credit sales are supported
+
+Customer data must be tenant-isolated.
+
+---
+
+# 14. Cash Register
+
+Support:
+
+- Registers
+- Opening cash
+- Cash session
+- Cashier assignment
+- Cash-in
+- Cash-out
+- Cash sales
+- Returns
+- Expected cash
+- Actual cash
+- Cash variance
+- Register closing
+- Reconciliation
+
+Every cash operation must be auditable.
+
+---
+
+# 15. Cash Denomination Tracking
+
+The architecture shall support denomination-aware cash management.
+
+Initial configurable denominations may include:
+
+- 1000
+- 500
+- 200
+- 100
+- 50
+- 20
+- 10
+- 5
+
+The system shall support:
+
+- Opening denomination count
+- Cash received denomination breakdown
+- Cash payout denomination breakdown
+- Closing denomination count
+- Expected cash
+- Actual cash
+- Variance
+- Cashier reconciliation
+
+Example:
+
+500 × 2
+100 × 3
+50 × 1
+
+The system must preserve denomination records as transaction/audit information.
+
+Important:
+
+Denomination tracking must not claim to automatically determine counterfeit currency unless actual hardware/currency-validation infrastructure is integrated.
+
+---
+
+# 16. Receipt Printing
+
+The platform shall support:
+
+- Thermal receipt printing
+- Standard receipt printing
+- Reprint
+- Print preview
+- Configurable receipt template
+- Store information
+- Tax information
+- Payment information
+- Return information
+- Barcode/QR where applicable
+
+Printer integration must be abstracted so different printer environments can be supported.
+
+---
+
+# 17. Reporting
+
+Reporting is a core feature.
+
+The platform shall provide:
+
+- Today sales
+- Yesterday sales
+- Daily sales
+- Weekly sales
+- Half-monthly sales
+- Monthly sales
+- Half-yearly sales
+- Yearly sales
+- Custom date-range reports
+- Product sales
+- Top-selling products
+- Slow-moving products
+- Stock reports
+- Low-stock reports
+- Out-of-stock reports
+- Purchase reports
+- Return reports
+- Refund reports
+- Payment reports
+- Cashier reports
+- Register reports
+- Branch reports
+- Profit reports
+- Expense reports
+- Tax reports
+
+Reports must support filtering by:
+
+- Date
+- Store
+- Branch
+- Cashier
+- Product
+- Category
+- Payment method
+
+Reporting queries must be optimized for production workloads.
+
+---
+
+# 18. Dashboard
+
+Dashboard should provide:
+
+- Today's sales
+- Today's transactions
+- Average transaction value
+- Top products
+- Low stock
+- Out of stock
+- Returns
+- Refunds
+- Expenses
+- Gross profit where data permits
+- Cash status
+- Branch comparison
+
+Dashboard data should use optimized queries/read models where necessary.
+
+---
+
+# 19. Offline POS
+
+Offline POS is a required product capability.
+
+The POS application must be capable of continuing essential sales operations during temporary internet outages.
+
+Offline architecture shall support:
+
+- Local POS database/storage
+- Cached products
+- Cached prices
+- Cached configuration
+- Device identity
+- Local transaction IDs
+- Offline sales queue
+- Synchronization
+- Retry
+- Duplicate detection
+- Idempotency
+- Conflict handling
+- Synchronization acknowledgement
+
+Financial transactions must never be duplicated during synchronization.
+
+The backend shall be authoritative after successful synchronization.
+
+---
+
+# 20. Synchronization
+
+Every offline transaction shall have a stable client-generated identity.
+
+Example:
+
+deviceId + localTransactionId
+
+The backend must support idempotent synchronization.
+
+Repeated submission of the same transaction must not create duplicate sales.
+
+Synchronization must be observable and auditable.
+
+---
+
+# 21. SaaS Subscription
+
+The system shall support:
+
+- Plans
+- Trials
+- Subscriptions
+- Subscription periods
+- Subscription status
+- Payment providers
+- Payment webhooks
+- Entitlements
+- License state
+- Usage limits
+
+Initial commercial model:
+
+3-day free trial.
+
+After successful payment:
+
+1-month subscription period.
+
+The trial duration must be configurable.
+
+The backend must be authoritative for subscription status.
+
+---
+
+# 22. Licensing
+
+Licensing shall support:
+
+- Tenant license
+- Subscription status
+- Trial status
+- Expiration
+- Grace period if configured
+- Feature entitlements
+- User limits
+- Branch limits
+- Register limits
+
+Frontend must never be trusted to determine whether a tenant is licensed.
+
+---
+
+# 23. Payment Architecture
+
+The platform shall abstract payment providers.
+
+Do not implement card processing internally.
+
+The architecture must support future integrations with:
+
+- Payment gateways
+- Acquirers
+- Card terminals
+- Mobile payment providers
+
+Card PIN and sensitive card authentication data must never be handled by the application unless explicitly required by a compliant certified integration.
+
+Terminal architecture:
+
+POS
+→ Payment Provider/Terminal Integration
+→ Payment Processor
+→ Bank/Card Network
+
+The POS should receive a payment result/reference rather than sensitive card credentials.
+
+---
+
+# 24. Multi-Currency & Localization
+
+Architecture shall support:
+
+- Currency
+- Locale
+- Time zone
+- Tax configuration
+- Number formatting
+- Date formatting
+
+Initial deployment may use BDT and Asia/Dhaka.
+
+The domain model must not hard-code BDT assumptions.
+
+---
+
+# 25. Tax
+
+Tax configuration shall support:
+
+- Tax rates
+- Inclusive/exclusive tax
+- Product-level tax
+- Store-level tax
+- Tax reporting
+
+Tax rules must be configurable.
+
+---
+
+# 26. Audit
+
+Audit logs shall record important actions:
+
+- Login
+- Logout
+- Product creation
+- Product modification
+- Inventory adjustment
+- Stock transfer
+- Sale
+- Sale void
+- Return
+- Refund
+- Cash movement
+- Register opening
+- Register closing
+- User changes
+- Permission changes
+- Subscription changes
+
+Audit records should include:
+
+- User
+- Tenant
+- Timestamp
+- Action
+- Entity
+- Entity ID
+- Correlation ID
+- Relevant metadata
+
+---
+
+# 27. API Standards
+
+APIs must have:
+
+- Consistent naming
+- API versioning strategy
 - Validation
+- Pagination
+- Filtering
+- Sorting
+- Correlation IDs
+- Idempotency where required
+- Consistent success response structure
+- RFC-compatible error responses
+- OpenAPI documentation
+
+Financial operations must support idempotency.
+
+---
+
+# 28. Error Handling
+
+Errors must never expose:
+
+- Secrets
+- Passwords
+- Tokens
+- Database credentials
+- Internal stack traces in production
+
+Errors must have stable machine-readable codes.
+
+Example:
+
+PRODUCT_NOT_FOUND
+
+SALE_ALREADY_COMPLETED
+
+INSUFFICIENT_STOCK
+
+RETURN_QUANTITY_EXCEEDED
+
+SUBSCRIPTION_EXPIRED
+
+TENANT_ACCESS_DENIED
+
+---
+
+# 29. Security
+
+Required:
+
+- Tenant isolation
 - Authentication
 - Authorization
-- Testing
-- CI/CD
-- Docker Support
-- Monitoring
-- Documentation
-- Git Standards
-- Release Notes
-- Database Migration
-- Seed Data
-- Health Checks
-- Observability
+- Input validation
+- Rate limiting
+- Secure secrets
+- HTTPS
+- Secure headers
+- Audit logging
+- Protection against injection
+- Protection against broken authorization
+- Protection against replay/duplicate financial transactions
+
+Security must be server-enforced.
 
 ---
 
-**End of Part 1**
+# 30. Rate Limiting
 
+Rate limiting shall exist at appropriate layers.
+
+Different limits may apply to:
+
+- Authentication
+- Password reset
+- Public APIs
+- Product search
+- Barcode lookup
+- Financial operations
+
+Distributed rate limiting should be supported when multiple API instances are deployed.
+
+Redis may be used for distributed coordination.
+
+---
+
+# 31. Scalability
+
+The architecture shall support horizontal API scaling.
+
+Target architecture:
+
+CDN/WAF
+→ Load Balancer
+→ API instances
+→ Redis
+→ Message broker
+→ PostgreSQL
+
+Infrastructure should scale when customer load requires it.
+
+Do not introduce unnecessary infrastructure before it is required.
+
+---
+
+# 32. Observability
+
+Production system must support:
+
+- Structured logging
+- Correlation IDs
+- Metrics
+- Distributed tracing
+- Health checks
+- Readiness checks
+- Liveness checks
+- Error monitoring
+- Performance monitoring
+
+---
+
+# 33. Backup & Disaster Recovery
+
+Production must have:
+
+- Automated database backups
+- Backup retention
+- Restore testing
+- Migration strategy
+- Disaster recovery documentation
+
+A backup that has never been restored successfully must not be considered verified.
+
+---
+
+# 34. Testing
+
+Required:
+
+- Unit tests
+- Integration tests
+- API tests
+- Database tests
+- Authorization tests
+- Tenant isolation tests
+- Financial transaction tests
+- Inventory concurrency tests
+- Return/refund tests
+- Idempotency tests
+- Offline synchronization tests
+- Load tests
+- Regression tests
+
+Critical financial workflows must have automated tests.
+
+---
+
+# 35. Frontend
+
+Required frontend architecture:
+
+- React 19
+- Next.js
+- TypeScript
+- Redux
+- Redux-Saga
+- Production-grade state management
+- Typed API clients
+- Form validation
+- Error boundaries
+- Permission-aware UI
+- Responsive design
+- Accessibility
+- POS keyboard optimization
+- Barcode scanner support
+- Thermal printing integration
+- Offline capability architecture
+
+Frontend projects:
+
+frontend/
+├── pos/
+└── inventory/
+
+The POS application must optimize speed of sale.
+
+The Inventory application must optimize management workflows.
+
+---
+
+# 36. Documentation
+
+Every major subsystem must contain:
+
+- README
+- Architecture overview
+- ADRs
+- Folder structure
+- C4 diagrams
+- Sequence diagrams where useful
+- Developer guide
+- API documentation
+- Testing guide
+- Deployment guide
+
+Every new CRUD domain must document how another developer can implement the next CRUD safely.
+
+---
+
+# 37. AI Development Rules
+
+AI agents must:
+
+1. Read MASTER-SPEC.md.
+2. Read ROADMAP.md.
+3. Read relevant ADRs.
+4. Read handover documentation.
+5. Inspect existing implementation.
+6. Never assume missing functionality exists.
+7. Never rewrite working systems unnecessarily.
+8. Preserve architecture.
+9. Add tests with features.
+10. Update documentation.
+11. Update roadmap status.
+12. Report blockers.
+13. Never claim production readiness without evidence.
+
+---
+
+# 38. Definition of Production Ready
+
+The system is production-ready only when:
+
+- Build passes
+- Tests pass
+- Critical workflows pass
+- Tenant isolation is verified
+- Authentication is secure
+- Authorization is verified
+- POS checkout works
+- Barcode workflow works
+- Inventory updates correctly
+- Returns work correctly
+- Refunds work correctly
+- Receipts work
+- Reports work
+- Cash reconciliation works
+- Audit logs work
+- Offline synchronization is verified
+- Duplicate transaction prevention works
+- Database backup/restore is tested
+- Monitoring works
+- Rate limiting works
+- Deployment is reproducible
+- Documentation is complete
+
+---
+
+# 39. Definition of Done
+
+A feature is not complete until:
+
+- Code implemented
+- Tests implemented
+- Tests passing
+- API documented
+- Frontend integrated where applicable
+- Authorization verified
+- Tenant isolation verified
+- Error handling implemented
+- Logging implemented
+- Documentation updated
+- ADR added when architectural decisions change
+- ROADMAP updated
+- Handover updated
+
+---
+
+# 40. Product Release Strategy
+
+Release order:
+
+1. Retail Core
+2. First production store
+3. Multi-branch
+4. Offline POS
+5. Subscription/Licensing
+6. Payment integrations
+7. Advanced analytics
+8. AI capabilities
+9. Internationalization
+10. Additional industry modules
+
+The platform must prioritize real customer reliability over feature count.
