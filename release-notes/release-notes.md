@@ -206,3 +206,41 @@ Fixed all 71 build errors and 30 build warnings reported by a real `dotnet resto
 - 30x NU1603/NU1902 warnings: `OpenTelemetry.Exporter.Prometheus.AspNetCore` was pinned to a version that was never published (`1.9.0-rc.1`); repinned the whole OpenTelemetry package set in `shared-infrastructure.csproj` to a verified, patched, mutually-compatible set (Extensions.Hosting/Exporter.OpenTelemetryProtocol 1.15.3, Instrumentation.AspNetCore 1.15.2, Instrumentation.Http/Runtime 1.15.1, Exporter.Prometheus.AspNetCore 1.15.3-beta.1), clearing 3 known moderate-severity advisories (GHSA-8785-wc3w-h8q6, GHSA-g94r-2vxg-569j, GHSA-4625-4j76-fww9).
 
 No business logic, tests, or previously-working files touched. Full detail in `handover/ai-handover.md`.
+
+---
+
+## 2026-08-23 — Frontend MVP (Inventory + POS) built and verified
+
+**Status:** First customer-demo-ready MVP frontend complete for both apps. Built against real,
+already-verified backend endpoints only — see `docs/API-GAPS.md` for exact contract notes and
+every documented gap. No backend files touched this session.
+
+**Inventory app** (`frontend/inventory`): dashboard (real counts only), Products full CRUD
+(list/search/filter/sort/paginate/create/edit/delete), Stock (list with low/out-of-stock filter,
+in/out/adjustment/transfer). 16-component design system, Redux Toolkit + redux-saga throughout,
+typed API clients written directly from the C# DTOs/controllers.
+
+**POS app** (`frontend/pos`): terminal setup (explicit demo-access banner, no fake auth), cash
+session open/close, product search + cart (client-side, unit-tested), checkout saga
+(create sale → add items → complete → fetch for receipt), print-friendly receipt, sale history +
+void, daily sales report (defaults to yesterday — backend generates reports overnight, not
+on-demand; documented rather than faked).
+
+**Verification (both apps):** `npm install`, `npm run typecheck`, `npm run lint`, `npm test`,
+`npm run build` all PASS. Inventory: 10/10 routes build, 12/12 tests pass. POS: 5/5 routes build,
+9/9 tests pass. Full command output recorded in `AI-HANDOVER.md` §F.
+
+**Docs added:** `docs/API-GAPS.md`, `docs/AI-CODING-RULES.md`,
+`docs/inventory/{ARCHITECTURE,PROGRAMMER-GUIDE,ADDING-A-CRUD}.md`,
+`docs/pos/{ARCHITECTURE,README,PROGRAMMER-GUIDE}.md`, per-app `README.md`, root
+`AI-HANDOVER.md`, root `NEXT-AI-PROMPT.md`.
+
+**Known, documented gaps (not defects):** Category/Brand/Unit/Warehouse/Store/Register have no
+backend CRUD, so forms use labeled manual-GUID input. Product search matches name/SKU, not
+barcode. Daily report has no on-demand generation. Cash session has no GET (tracked in
+localStorage). Full detail and priority ranking in `docs/API-GAPS.md`.
+
+**Not verified:** live runtime against a running backend instance (none available in this
+environment). See `AI-HANDOVER.md` §H for the recommended next step.
+
+Trust `AI-HANDOVER.md` and `git log` over this entry for anything more recent.
