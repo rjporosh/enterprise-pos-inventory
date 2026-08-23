@@ -1,0 +1,130 @@
+# API Gaps & Backend/Frontend Contract Notes
+
+Generated from a direct reading of the backend source (controllers, DTOs, handlers, validators,
+migrations) — not from `docs/API-CONTRACT.md`, `docs/MASTER-SPEC.md`, or `docs/ROADMAP.md`, which
+describe a larger product than what's implemented. Where those documents and the real code
+disagree, this file follows the real code, and the disagreement is called out explicitly below.
+
+The frontend (`frontend/inventory`, `frontend/pos`) is built strictly against what's documented
+here. It does not call, mock, or assume any endpoint not listed under "What exists."
+
+---
+
+## 1. Endpoint inventory (verified by reading the controllers directly)
+
+### inventory-service
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/api/v1/products` | Returns the new product's `Guid` id, 200. |
+| GET | `/api/v1/products/{id}` | `ProductDto`, 404 if not found. |
+| GET | `/api/v1/products` | `PagedResult<ProductListItemDto>`. Filters: `pageNumber`, `pageSize`, `categoryId`, `brandId`, `isActive`, `searchTerm`, `sortBy` (name/sku/price/createdat), `sortDescending`. |
+| PUT | `/api/v1/products/{id}` | 204. Body `id` must match route `id`. |
+| DELETE | `/api/v1/products/{id}` | 204. |
+| POST | `/api/v1/stocks` | Create a stock record for a product/warehouse. |
+| GET | `/api/v1/stocks/{id}` | `StockDto`. |
+| GET | `/api/v1/stocks` | `PagedResult<StockListItemDto>`. Filters: `productId`, `warehouseId`, `lowStock`, `outOfStock`. |
+| PUT | `/api/v1/stocks/{id}` | Update reorder/max levels. |
+| DELETE | `/api/v1/stocks/{id}` | 204. |
+| POST | `/api/v1/stocks/in` | Stock-in movement. |
+| POST | `/api/v1/stocks/out` | Stock-out movement. |
+| POST | `/api/v1/stocks/adjustment` | Signed quantity adjustment. |
+| POST | `/api/v1/stocks/transfer` | Move stock between two warehouses. |
+
+### pos-service
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/api/v1/sales` | Opens a Draft sale, returns the sale's `Guid` id. |
+| GET | `/api/v1/sales/{id}` | Full `SaleDto` (items + payments). |
+| GET | `/api/v1/sales` | `PagedResult<SaleListItemDto>`. Filters: `storeId`, `cashierId`, `status`, `fromDate`, `toDate`. |
+| POST | `/api/v1/sales/items` | Add a line item. Returns the new item's `Guid` id, 200. |
+| DELETE | `/api/v1/sales/items` | Remove a line item. 204. Body-based delete (`{ saleId, saleItemId }`), not a path param. |
+| POST | `/api/v1/sales/complete` | **204, no body.** Fetch the sale again via GET to get the finalized totals/receipt data. |
+| POST | `/api/v1/sales/void` | 204. |
+| POST | `/api/v1/cash-sessions/open` | Returns the new session's `Guid` id. |
+| POST | `/api/v1/cash-sessions/close` | 204. |
+| GET | `/api/v1/reports/daily-sales?storeId=&reportDate=` | 404 `REPORT_NOT_FOUND` if the report hasn't been generated yet (see §3 below — this is the normal case for "today"). |
+
+### Response/error shape (verified, not from API-CONTRACT.md)
+
+- Success responses are the **raw resource** (or `PagedResult<T>`), not a `{ success, data, meta }`
+  envelope.
+- Error responses are RFC7807 `ProblemDetails` produced via `Problem(title:, detail:, statusCode:,
+  instance:)`. `title` carries the domain error code (e.g. `PRODUCT_NOT_FOUND`,
+  `SALE_NOT_FOUND`), `detail` carries the human-readable message.
+- Several mutating endpoints return `204 No Content` with **no body**: `RemoveItem`,
+  `CompleteSale`, `VoidSale`, `CloseSession`, product/stock `DELETE`, product `PUT`. The frontend
+  API clients handle this (see `lib/api/client.ts` in both apps, `response.status === 204`).
+
+**Severity: Medium — documentation drift.** `docs/API-CONTRACT.md` describes a `{success, data,
+meta}` envelope that the live controllers do not produce. Anyone integrating against
+API-CONTRACT.md alone (rather than the controllers) will write a client that mis-parses every
+response. Recommend updating API-CONTRACT.md to match reality, or annotating it as aspirational/v2.
+
+---
+
+## 2. Endpoints referenced by docs/MASTER-SPEC.md, ROADMAP.md, or FRONTEND-MASTER-PROMPT.md that
+   **do not exist in the backend**
+
+None of these are implemented by the frontend. Each is a documented, intentional gap.
+
+| Missing capability | Why the frontend needs it | Expected shape (proposed) | Depends on | Priority |
+|---|---|---|---|---|
+| **Category / Brand / Unit CRUD** | `Product` requires `categoryId`, `brandId`, `unitId` as GUIDs, but there's no endpoint to list/create them. The Products form currently accepts these as raw GUID text input with an inline warning. This is the single biggest usability blocker for a non-technical shop owner. | `GET/POST /api/v1/categories`, same for `brands`, `units` — simple id+name(+symbol for unit) CRUD, list unpaginated (these are reference data, expected to be small). | None — additive. | **High** |
+| **Warehouse CRUD** | `Stock` requires `warehouseId`. Same problem as above for every stock operation (in/out/adjustment/transfer) and for `Sale`'s implicit register→store→warehouse chain. | `GET/POST /api/v1/warehouses`. | None — additive. | **High** |
+| **Store / Register CRUD** | POS `CreateSaleRequest` requires `storeId` and `registerId`; `OpenSessionRequest` requires `registerId`. No endpoint exists to list or create these, so the POS "terminal setup" screen asks the operator to paste GUIDs directly, explicitly labeled as a stand-in. | `GET/POST /api/v1/stores`, `GET/POST /api/v1/registers`. | None — additive. | **High** |
+| **Authentication / current user** | Nothing in either service issues or checks a token. `CashierId` throughout POS is a raw pasted GUID rather than a logged-in identity. | Standard login → JWT/session, `cashierId` derived from the token server-side rather than trusted from the client. | Real auth is a larger, separate effort (RBAC, tenancy). | **High**, but explicitly out of scope for this MVP per the product brief. |
+| **Barcode lookup / barcode-aware search** | `Product.Barcode` exists and is stored, but `GetAllProductsQuery`'s `SearchTerm` filter only matches `Name` and `Sku` (verified in `ProductRepository`, the `Where` clause is `Name.Contains || Sku.Contains`). There is an **unused** `GetByBarcodeAsync` method on the repository with no controller route calling it. A USB barcode scanner typing into the POS search box will only find a product if the barcode text happens to also match the name/SKU. | Either wire `GetByBarcodeAsync` to `GET /api/v1/products/by-barcode/{barcode}`, or add `Barcode` to the existing `SearchTerm` `Where` clause. The latter is a one-line change and is the recommended fix. | None — the repository method already exists. | **High** — cheap fix, real UX impact. |
+| **On-demand / "today" daily sales report** | `DailySalesReportJob` is a background service that generates one `DailySalesReport` row per store per UTC calendar day, at UTC midnight, with a 7-day catch-up window on restart. There is no "generate now" endpoint. `GET /api/v1/reports/daily-sales?reportDate=<today>` will 404 with `REPORT_NOT_FOUND` for the entire current day, every day, by design. | A `POST /api/v1/reports/daily-sales/generate?storeId=&reportDate=` (idempotent, same underlying `GenerateIfMissingAsync`) that the frontend can call on-demand for "today," or a live/unmaterialized query path that computes the same aggregate without persisting it. | `DailySalesReportGenerator.GenerateIfMissingAsync` already contains the aggregation logic and just needs an HTTP trigger. | **High** — "how did today go" is a core daily question for a shop owner and currently cannot be answered same-day. |
+| **Cash session GET (by id / list / "current open session")** | The frontend cannot ask the backend "is there an open session for register X" — it can only open/close blind. The POS app currently tracks the session it opened in `localStorage` as a local source of truth, which cannot detect a session opened on another device, and can drift if closed elsewhere. | `GET /api/v1/cash-sessions/{id}`, `GET /api/v1/cash-sessions?registerId=&status=Open`. | None — additive, `CashSessionDto` already exists in the DTOs. | **High** |
+| Returns / partial refunds | `SalesController` only has `Void` (all-or-nothing, Draft/Completed → Voided). No partial-return or refund endpoint. | Out of scope for this MVP per the product brief — documented here for the roadmap, not blocking. | New domain concept. | Medium (deferred) |
+| Receipt-specific endpoint | No dedicated receipt/print endpoint. The frontend builds a print-friendly receipt directly from the `SaleDto` returned by `GET /api/v1/sales/{id}`, which has enough data (items, payments, totals) for a basic receipt. | N/A — current `SaleDto` is sufficient for MVP receipts. | — | Low (not currently a gap) |
+| Weekly/monthly/yearly/top-products-standalone/cashier/branch/profit/expense reports | Only `daily-sales` exists. | Out of scope for this MVP per the product brief. | New reporting endpoints. | Deferred |
+| Multi-tenancy / branch switching, subscriptions/entitlements, offline sync | Not implemented anywhere in the backend beyond a marker `ITenantEntity` interface. | Out of scope for this MVP per the product brief. | Large, separate initiatives. | Deferred |
+
+---
+
+## 3. Why the frontend is built the way it is, given the above
+
+- **Category/Brand/Unit/Warehouse/Store/Register fields are plain GUID text inputs**, each with an
+  inline hint explaining that management UI isn't available yet. This was a deliberate choice over
+  fabricating a dropdown backed by fake data — a fake dropdown would look finished and hide a real
+  blocker; a labeled GUID field is honest about the current limitation. This is the top usability
+  issue for a first customer demo and should be the first backend follow-up (see §2, "High").
+- **POS search box searches name/SKU, not barcode**, and says so in the UI, for the reason in §2.
+  The input is still built to be scanner-friendly (auto-submits the first result on Enter) so it
+  will work correctly the moment barcode matching is added server-side — no frontend change needed.
+- **The Reports page defaults its date picker to yesterday**, not today, and shows an explicit
+  "generated overnight" explanation with a `not-found` empty state rather than a misleading blank
+  "$0 in sales" for today.
+- **Cash session state is tracked client-side in `localStorage`** after a successful open/close,
+  because there's no way to ask the server for current state. This is called out in
+  `lib/api/cashSessionsAndReports.ts` and in the Setup page.
+- **The POS cart is a pure client-side Redux slice** (`features/cart`) and is not synced to the
+  backend line-by-line as items are added. A `Sale` (draft) is only created, and items only added
+  via `POST /api/v1/sales/items`, at the moment the cashier presses "Complete sale" — the saga then
+  creates the sale, adds each cart line, completes it, and re-fetches the sale for the receipt, in
+  that order. This was chosen over "sync every cart edit to the backend" for two reasons: (1) it
+  keeps the cashier-facing cart interaction instant with zero network round-trips while building an
+  order, which matters for the "POS must feel fast" requirement, and (2) it avoids leaving orphaned
+  Draft sales server-side for carts the cashier abandons or clears. The backend remains fully
+  authoritative for the persisted sale — the frontend never fabricates a sale number, total, or
+  change amount; all of those come from the `SaleDto` returned after `Complete`.
+- **"DEMO / DEVELOPMENT ACCESS" banner** on the POS setup page makes explicit that store/register/
+  cashier identity is manually entered because there is no authentication, per the product brief's
+  explicit instruction not to fake a login.
+
+---
+
+## 4. Recommended backend priority order for Version 2
+
+1. Wire `Barcode` into the existing `SearchTerm` filter (or expose `GetByBarcodeAsync`) — smallest
+   change, real POS-speed impact.
+2. Add a `POST /reports/daily-sales/generate` (or equivalent) trigger so "today" is answerable.
+3. Category / Brand / Unit / Warehouse / Store / Register minimal CRUD — removes all the manual-GUID
+   friction across both apps in one pass.
+4. Cash session GET (by id, and "current open for register") — removes the localStorage-as-source-
+   of-truth workaround.
+5. Authentication — everything above still works without it for a pilot with 1 trusted operator per
+   terminal, but it's required before this goes to unattended multi-cashier use.
