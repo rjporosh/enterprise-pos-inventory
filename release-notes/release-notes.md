@@ -244,3 +244,44 @@ localStorage). Full detail and priority ranking in `docs/API-GAPS.md`.
 environment). See `AI-HANDOVER.md` §H for the recommended next step.
 
 Trust `AI-HANDOVER.md` and `git log` over this entry for anything more recent.
+
+---
+
+## 2026-08-28 session
+
+**Environment note:** this session's sandbox had `node`/`npm` only — no `dotnet` SDK, no NuGet
+access. All `services/*` (.NET) work was read-only analysis; no backend code was built, run, or
+modified. Full detail in `needed-credentials.md` (new file this session).
+
+**Verified (re-ran, no regressions):** `frontend/inventory` and `frontend/pos` — install,
+typecheck, lint, test, build all still PASS. Inventory 11/11 routes, 12/12 tests. POS 7/7 routes,
+9/9 tests (route counts grew from the last recorded 10 and 5 as app pages were added in the prior
+session; not a regression).
+
+**Shipped this session (frontend-only, fully verified):**
+- POS thermal receipt printing now supports real 58mm and 80mm paper profiles instead of one
+  generic print stylesheet. `TerminalConfig.receiptPaperWidthMm` (58 | 80) is set on the Setup
+  page, persisted to `localStorage` alongside the rest of terminal identity, and used by
+  `features/sale/components/Receipt.tsx` to set `@page` size, printable width, and a monospace
+  font sized per profile (48mm printable / 9pt for 58mm rolls, 72mm printable / 10.5pt for 80mm
+  rolls). Existing saved configs without the field default to 80mm. This renders via the browser
+  print dialog to any thermal printer with an OS print driver — it is not a raw ESC/POS bridge
+  (that remains not-started, see `docs/ROADMAP-v3.0.md` Phase 7).
+
+**Corrected, not shipped (documentation only):**
+- `docs/API-GAPS.md` had two stale rows: it said no authentication existed anywhere and that
+  multi-tenancy/subscriptions were unimplemented "beyond a marker interface." Both were true when
+  written but predate commit `0e79624`, which added full `auth-service` (login/refresh/RBAC/audit/
+  OTP) and `notification-service` (send/templates/preferences) — real, substantial services, just
+  not yet called by either frontend app. The tenancy/subscription/trial finding was re-verified and
+  is still accurate: nothing exists anywhere in the repo for licensing/subscriptions/trials.
+- `needed-credentials.md` created — documents the `dotnet`-less sandbox constraint, that no demo
+  credentials/seed data exist yet (seeding needs a live Postgres via `dotnet ef`, unavailable
+  here), and the env vars that will be needed once auth is wired in.
+
+**Not attempted this session (needs `dotnet` + Docker):** AuthService/NotificationService frontend
+integration, the license/subscription/trial engine (does not exist in any form — this is
+from-scratch backend work, not integration), enterprise demo data seeding. See `AI-HANDOVER.md`
+§I for the full breakdown and exact next command.
+
+Trust `AI-HANDOVER.md` and `git log` over this entry for anything more recent.

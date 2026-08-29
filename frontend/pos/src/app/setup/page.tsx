@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Field, Input, PageHeader } from "@/components/ui";
+import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
-import { configSaved } from "@/features/session/slice";
+import { configSaved, ReceiptPaperWidth } from "@/features/session/slice";
 import {
   cashSessionCloseRequested,
   cashSessionCloseReset,
@@ -19,6 +19,7 @@ export default function SetupPage() {
   const [storeId, setStoreId] = useState("");
   const [registerId, setRegisterId] = useState("");
   const [cashierId, setCashierId] = useState("");
+  const [receiptPaperWidthMm, setReceiptPaperWidthMm] = useState<ReceiptPaperWidth>(80);
   const [openingBalance, setOpeningBalance] = useState("0");
   const [closingBalance, setClosingBalance] = useState("0");
   const [closeNotes, setCloseNotes] = useState("");
@@ -28,6 +29,7 @@ export default function SetupPage() {
       setStoreId(config.storeId);
       setRegisterId(config.registerId);
       setCashierId(config.cashierId);
+      setReceiptPaperWidthMm(config.receiptPaperWidthMm);
     }
   }, [config]);
 
@@ -39,7 +41,7 @@ export default function SetupPage() {
 
   function saveConfig(e: React.FormEvent) {
     e.preventDefault();
-    dispatch(configSaved({ storeId, registerId, cashierId }));
+    dispatch(configSaved({ storeId, registerId, cashierId, receiptPaperWidthMm }));
   }
 
   function openSessionHandler(e: React.FormEvent) {
@@ -84,6 +86,16 @@ export default function SetupPage() {
             </Field>
             <Field label="Cashier ID" htmlFor="cashierId" required hint="No login yet — paste the cashier's user GUID.">
               <Input id="cashierId" value={cashierId} onChange={(e) => setCashierId(e.target.value)} required />
+            </Field>
+            <Field label="Receipt printer paper width" htmlFor="receiptPaperWidthMm" hint="Thermal printer width — controls the receipt print layout.">
+              <Select
+                id="receiptPaperWidthMm"
+                value={receiptPaperWidthMm}
+                onChange={(e) => setReceiptPaperWidthMm(Number(e.target.value) as ReceiptPaperWidth)}
+              >
+                <option value={58}>58mm</option>
+                <option value={80}>80mm</option>
+              </Select>
             </Field>
           </div>
           <div className="form-actions">

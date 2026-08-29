@@ -53,7 +53,8 @@
 - [ ] Subscription/billing/licensing
 - [ ] Entitlement/quota enforcement
 - [ ] Barcode generation/scanning end-to-end
-- [ ] Thermal printer integration
+- [~] Thermal printer integration — 58mm/80mm browser-print CSS profiles shipped 2026-08-28
+      (`frontend/pos`); ESC/POS adapter and local print bridge still not started
 - [ ] Cash drawer integration
 - [ ] Certified card-terminal integration
 - [ ] Returns/refunds
@@ -313,11 +314,13 @@ A real cashier can reconcile a physical drawer at the end of a shift.
 ---
 
 # Phase 7 — Thermal Printing & Physical Payment Devices
-**Status: NOT STARTED**
+**Status: PARTIALLY STARTED** — 58mm/80mm print CSS profiles shipped 2026-08-28; ESC/POS adapter,
+local print bridge, and all card-terminal items below remain not started.
 
 ### Printing
+- [x] 58mm/80mm profiles — browser-print CSS profiles only (2026-08-28); ESC/POS adapter and local
+      print bridge below are still not started
 - [ ] ESC/POS adapter
-- [ ] 58mm/80mm profiles
 - [ ] Receipt templates
 - [ ] Reprint
 - [ ] Print preview

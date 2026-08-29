@@ -6,10 +6,14 @@ import { toastShown } from "@/components/ui/toastSlice";
 
 const STORAGE_KEY = "pos.session.v1";
 
+export type ReceiptPaperWidth = 58 | 80;
+
 export interface TerminalConfig {
   storeId: string;
   registerId: string;
   cashierId: string;
+  /** Thermal receipt printer paper width in mm. Defaults to 80 for existing saved configs. */
+  receiptPaperWidthMm: ReceiptPaperWidth;
 }
 
 export interface OpenSession {
@@ -44,7 +48,10 @@ function loadPersisted(): Pick<SessionState, "config" | "openSession"> {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return { config: null, openSession: null };
     const parsed = JSON.parse(raw);
-    return { config: parsed.config ?? null, openSession: parsed.openSession ?? null };
+    const config: TerminalConfig | null = parsed.config
+      ? { receiptPaperWidthMm: 80, ...parsed.config }
+      : null;
+    return { config, openSession: parsed.openSession ?? null };
   } catch {
     return { config: null, openSession: null };
   }

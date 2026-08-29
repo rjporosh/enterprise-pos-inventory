@@ -192,3 +192,130 @@ No known blocker prevents this from being demoed to a real customer for the curr
 MVP scope, other than the manual-GUID friction for category/brand/unit/warehouse/store/register
 documented in §C/§D and `docs/API-GAPS.md` — that's a real, known rough edge for a non-technical
 operator, not a defect, and the highest-priority backend follow-up.
+
+---
+
+## I. Session addendum — 2026-08-28
+
+**Scope of the incoming request**: continue toward a production-ready enterprise multi-tenant
+SaaS (auth integration, notification integration, a license/subscription engine, thermal
+printing, barcode scan+generation, enterprise demo data). This addendum records what was actually
+verified this session, per this file's own rule of not marking things DONE without verification.
+
+### Environment constraint (read this before continuing)
+
+This session's sandbox had **`node`/`npm` only — no `dotnet` SDK, and network access limited to
+npm/GitHub-style registries (no NuGet)**. Full detail and recommendation in `needed-credentials.md`
+(new file, created this session). Net effect: everything below that touches
+`services/*` could be **read and analyzed**, but not built, migrated, run, or verified.
+
+### What was verified this session (commands actually run)
+
+```
+frontend/inventory: npm install, npm run typecheck, npm run lint, npm test (12/12), npm run build (11/11 routes)
+frontend/pos:        npm install, npm run typecheck, npm run lint, npm test (9/9), npm run build (7/7 routes)
+```
+Both apps still build clean, unchanged from the prior session's checklists (§C/§D above remain
+accurate). No frontend source was modified this session — this was a verification pass, not a
+feature pass. Inventory now has 11 routes vs. the 10 documented in §F above (routing behavior was
+not investigated further; not a regression, both `npm run build` and `npm test` are green).
+
+### Key finding: §E above ("Backend: no changes") and `docs/API-GAPS.md`'s auth/tenancy rows were stale
+
+`services/auth-service` and `services/notification-service` were added in commit `0e79624`
+("auth-service and notification-service added"), which **postdates** this handover file and
+`docs/API-GAPS.md`. Both are substantial, real implementations, not stubs:
+
+- **auth-service** (213 `.cs` files): register/login/refresh/logout/me, change/forgot/reset
+  password, OTP, security questions, audit logs, and full RBAC admin (permissions/modules/roles,
+  role↔permission and user↔role assignment). Minimal-API `Endpoints` style, not MVC controllers.
+- **notification-service** (134 `.cs` files): send/list/get/cancel/retry/soft-delete
+  notifications, recipient preferences, templates, Email/SMS/Push channel abstractions, outbox
+  pattern, scheduling jobs.
+
+**Neither is integrated into either frontend app.** POS still uses a raw pasted `cashierId` GUID;
+there is no login screen, token storage, or RBAC-aware UI in either app; there is no in-app
+notification bell/panel anywhere.
+
+**Also re-confirmed, still accurate**: there is **no license/subscription/trial/tenant-isolation
+code anywhere in the repository** — a repo-wide grep for those terms across all four services
+turns up only the pre-existing `BaseEntity` marker field. The "3-day trial / monthly subscription /
+module entitlement" engine requested does not exist in any form and would be a from-scratch domain
+model + migrations + middleware, needing `dotnet` to build and verify.
+
+`docs/API-GAPS.md` has been corrected in place (two rows updated/added) rather than trusted as-is.
+
+### Remaining tasks, in the order they'd need to happen
+
+1. **Get a `dotnet` + Docker environment** (Claude Code desktop/terminal, or local machine) — this
+   is the actual blocker, not a task. `docker-compose up` (Postgres/Redis/RabbitMQ/Seq) plus each
+   service's own launch profile needs to run so `dotnet build`/`dotnet test`/`dotnet ef` can be
+   verified, per §H above (still the single most valuable unverified step, now four services deep
+   instead of two).
+2. Wire `auth-service` into both frontend apps: shared JWT/refresh-token client, auth Redux slice,
+   route guards, RBAC-aware UI, `cashierId`/`userId` derived from the token.
+3. Wire `notification-service` into both frontend apps: notifications client/slice, bell/panel UI;
+   wire inventory-service low-stock events (and any future trial/subscription events) to call it.
+4. Design and build the license/subscription/entitlement engine from scratch (domain model,
+   migrations, middleware, upgrade-flow UI) — this is new backend work, not integration.
+5. Thermal receipt printing (58mm/80mm) and barcode generation are frontend-only concerns
+   (`features/sale/components/Receipt.tsx` print CSS; a barcode-rendering library for the
+   Inventory product form). **58mm/80mm receipt printing was implemented and verified this
+   session** — see the "Shipped this session" entry below. Barcode generation (product labels)
+   was not reached this session — genuinely next if continuing in a `node`-only environment.
+6. Enterprise demo data seeding needs a live Postgres reachable by `dotnet ef`/migrations — blocked
+   on item 1.
+
+### Shipped this session (frontend-only, fully verified)
+
+- **POS thermal receipt printing, real 58mm/80mm profiles.** `TerminalConfig.receiptPaperWidthMm`
+  (`58 | 80`, default `80` for backward compatibility with previously-saved configs) added to
+  `features/session/slice.ts`, exposed as a `<Select>` on the Setup page (`app/setup/page.tsx`),
+  and consumed by `features/sale/components/Receipt.tsx` to set `@page` size, printable width
+  (48mm/72mm — printable area, not roll width), and a monospace font sized per profile (9pt/10.5pt)
+  in the print stylesheet. This is a browser-print-dialog-driven receipt, not a raw ESC/POS bridge
+  — that item remains not-started per `docs/ROADMAP-v3.0.md` Phase 7 "Local print bridge."
+  Re-verified clean after the change: `frontend/pos` typecheck/lint/test(9/9)/build(7/7 routes) all
+  pass. Files changed: `features/session/slice.ts`, `app/setup/page.tsx`,
+  `features/sale/components/Receipt.tsx`.
+
+
+### Exact next command
+
+**If continuing in a `node`-only sandbox** (no `dotnet`): implement barcode generation for the
+Inventory product form (`frontend/inventory/src/features/products/components/ProductForm.tsx` +
+product list/detail views) using a pure-JS barcode-rendering library reachable via npm, rendering
+the existing `Product.Barcode` field as a scannable image/label. Verify with the same
+typecheck/lint/test/build loop used this session.
+
+**If continuing with `dotnet` + Docker available** (needed for everything else on this list):
+```
+cd enterprise-pos-inventory
+docker-compose up -d
+dotnet restore EnterprisePOS.sln && dotnet build EnterprisePOS.sln
+```
+Then follow `docs/ROADMAP-v3.0.md` Phase 1 exit criteria before starting Phase 2 (auth/tenancy).
+
+### Suggested commit message for this session
+
+```
+feat(pos): add 58mm/80mm thermal receipt paper profiles; docs: correct stale
+auth/notification gaps, add needed-credentials.md
+
+- features/session/slice.ts: TerminalConfig gains receiptPaperWidthMm (58|80,
+  default 80 for backward compat with saved configs)
+- app/setup/page.tsx: paper-width selector on terminal identity form
+- features/sale/components/Receipt.tsx: real @page/printable-width/font-size
+  print profiles per paper width, replacing the one-size print stylesheet
+- docs/API-GAPS.md: auth-service and notification-service exist (added in 0e79624,
+  after this doc was written) but are not yet integrated into either frontend app;
+  re-confirm no license/subscription/tenant-isolation code exists anywhere
+- needed-credentials.md: new — documents the dotnet/NuGet-less sandbox constraint
+  hit this session, demo-credential placeholders (none exist yet), and env vars
+- AI-HANDOVER.md, release-notes/release-notes.md: record session findings and
+  the receipt-printing change
+
+Verified: frontend/inventory and frontend/pos both pass typecheck/lint/test/build
+(11/11 and 7/7 routes respectively, 12/12 and 9/9 tests). No backend source
+touched — services/* could not be built/run in this sandbox (no dotnet SDK).
+```
