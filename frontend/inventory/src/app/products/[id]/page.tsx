@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { PageHeader, Card, ErrorState, Skeleton } from "@/components/ui";
+import { Button, PageHeader, Card, ErrorState, Skeleton } from "@/components/ui";
 import { ProductForm } from "@/features/products/components/ProductForm";
+import { BarcodeLabelModal } from "@/features/products/components/BarcodeLabelModal";
 import { ProductFormValues, toCreateProductInput } from "@/features/products/validation";
 import { Product } from "@/lib/api/products";
 import {
@@ -20,6 +21,7 @@ export default function EditProductPage() {
   const router = useRouter();
   const detail = useAppSelector((s) => s.products.detail);
   const updateState = useAppSelector((s) => s.products.update);
+  const [showBarcodeLabel, setShowBarcodeLabel] = useState(false);
 
   useEffect(() => {
     dispatch(productDetailRequested(id));
@@ -38,7 +40,17 @@ export default function EditProductPage() {
 
   return (
     <>
-      <PageHeader title="Edit product" subtitle={detail.data ? `SKU ${detail.data.sku}` : undefined} />
+      <PageHeader
+        title="Edit product"
+        subtitle={detail.data ? `SKU ${detail.data.sku}` : undefined}
+        actions={
+          detail.data?.barcode ? (
+            <Button variant="secondary" size="sm" onClick={() => setShowBarcodeLabel(true)}>
+              Print barcode label
+            </Button>
+          ) : undefined
+        }
+      />
 
       {detail.status === "loading" && (
         <Card>
@@ -70,6 +82,15 @@ export default function EditProductPage() {
             onCancel={() => router.push("/products")}
           />
         </Card>
+      )}
+
+      {showBarcodeLabel && detail.data?.barcode && (
+        <BarcodeLabelModal
+          productName={detail.data.name}
+          sku={detail.data.sku}
+          barcode={detail.data.barcode}
+          onClose={() => setShowBarcodeLabel(false)}
+        />
       )}
     </>
   );

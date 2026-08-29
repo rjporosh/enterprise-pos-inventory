@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Field, Input, Button } from "@/components/ui";
 import { ProductFormErrors, ProductFormValues, validateProductForm } from "../validation";
+import { BarcodeLabel } from "./BarcodeLabel";
 
 interface ProductFormProps {
   initialValues: ProductFormValues;
@@ -75,6 +76,11 @@ export function ProductForm({
 
         <Field label="Barcode" htmlFor="barcode" error={errors.barcode} hint="Optional. Scan or type.">
           <Input id="barcode" value={values.barcode} onChange={(e) => set("barcode", e.target.value)} hasError={!!errors.barcode} />
+          {values.barcode.trim() && !errors.barcode && (
+            <div style={{ marginTop: 10 }}>
+              <BarcodeLabel value={values.barcode} height={40} width={1.4} />
+            </div>
+          )}
         </Field>
 
         <div className="form-grid-full">

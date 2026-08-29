@@ -285,3 +285,34 @@ from-scratch backend work, not integration), enterprise demo data seeding. See `
 §I for the full breakdown and exact next command.
 
 Trust `AI-HANDOVER.md` and `git log` over this entry for anything more recent.
+
+## 2026-08-30 session
+
+**Environment note:** same `node`/`npm`-only sandbox as the prior session — no `dotnet` SDK. This
+was the exact next command from the prior session's handover: barcode generation for the
+Inventory app, frontend-only.
+
+**Verified (re-ran):** `frontend/inventory` — install, typecheck, lint, test, build all PASS
+(11/11 routes, 15/15 tests, up from 12 as a new component test file was added). `frontend/pos` and
+`services/*` were not touched this session.
+
+**Shipped this session (frontend-only, fully verified):**
+- Barcode label generation for the Inventory product catalog, using `jsbarcode` (new npm
+  dependency) to render `Product.Barcode` as a scannable Code128 SVG:
+  - Live preview on the product form as a barcode value is typed or scanned in.
+  - A "Label" action on each row of the products list (shown only when that product has a
+    barcode) opening a print-friendly label view.
+  - A "Print barcode label" button on the product edit/detail page.
+  - Code128 was used rather than a numeric symbology (EAN/UPC) because the backend stores
+    `Barcode` as free text with no format constraint — Code128 encodes whatever was actually
+    saved instead of rejecting it.
+  - This covers barcode *generation/printing* only. Barcode *scanning* into the POS search box
+    and barcode-aware backend search remain the pre-existing gap already tracked in
+    `docs/API-GAPS.md` ("Barcode lookup / barcode-aware search") — unrelated and unchanged.
+
+**Not attempted this session (needs `dotnet` + Docker):** everything else on the prior session's
+remaining-tasks list — auth-service/notification-service frontend integration, the
+license/subscription/trial engine, enterprise demo data seeding. See `AI-HANDOVER.md` §J for the
+full breakdown.
+
+Trust `AI-HANDOVER.md` and `git log` over this entry for anything more recent.

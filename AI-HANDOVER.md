@@ -101,6 +101,7 @@ inventory of what was written and verified this session (see §E for verificatio
 | Toast system | DONE |
 | Tests | DONE — 12 tests (7 validation, 5 stock slice), all passing |
 | Category/Brand/Unit/Warehouse pickers | **NOT DONE — no backend endpoint exists.** Forms use labeled manual-GUID text inputs instead. See `docs/API-GAPS.md`. This is intentional, not an oversight. |
+| Barcode generation (product form live preview, list "Label" action, detail/edit "Print barcode label") | DONE — `features/products/components/BarcodeLabel.tsx` (Code128 SVG via `jsbarcode`) + `BarcodeLabelModal.tsx` (print view). Client-side only — renders whatever string is already stored in `Product.Barcode`; does not touch barcode *scanning* or POS barcode-aware search, which remain the backend gap tracked in `docs/API-GAPS.md`. |
 
 ## D. POS app — precise checklist
 
@@ -318,4 +319,101 @@ auth/notification gaps, add needed-credentials.md
 Verified: frontend/inventory and frontend/pos both pass typecheck/lint/test/build
 (11/11 and 7/7 routes respectively, 12/12 and 9/9 tests). No backend source
 touched — services/* could not be built/run in this sandbox (no dotnet SDK).
+```
+
+## J. Session addendum — 2026-08-30
+
+**Scope of the incoming request**: the exact next command from §I above — implement barcode
+generation for the Inventory product form in this `node`-only sandbox (no `dotnet`, same
+constraint as §I; unchanged, see `needed-credentials.md`).
+
+### What was verified this session (commands actually run)
+
+```
+frontend/inventory: npm install, npm run typecheck, npm run lint, npm test (15/15), npm run build (11/11 routes)
+```
+
+`frontend/pos` was not touched and not re-verified this session (no changes made there).
+
+### Shipped this session (frontend-only, fully verified)
+
+- **Barcode generation for the Inventory product form, list, and edit/detail page.** Added
+  `jsbarcode` (a pure-JS Code128 SVG renderer) as a runtime dependency, `@types/jsbarcode` as a
+  dev dependency. Code128 was chosen over EAN/UPC because `Product.Barcode` is free-text on the
+  backend (see `lib/api/products.ts`), not a pre-validated numeric symbology, so encoding whatever
+  was actually typed/scanned in is the only approach that won't reject legitimately-saved data.
+  - `features/products/components/BarcodeLabel.tsx` (new) — renders an SVG barcode for a given
+    value, with a "no barcode set" placeholder for empty values and a non-crashing error state if
+    `jsbarcode` itself throws.
+  - `features/products/components/BarcodeLabelModal.tsx` (new) — a print-friendly single-label
+    modal, using the same visibility-based `@media print` pattern as
+    `frontend/pos/src/features/sale/components/Receipt.tsx` (hide everything except the label,
+    `window.print()`), so no popup window or new dependency for printing was needed.
+  - `features/products/components/ProductForm.tsx` — live barcode preview under the Barcode field
+    as the value is typed or scanned in.
+  - `app/products/page.tsx` — a "Label" row action (shown only when that product has a barcode)
+    opening the print modal.
+  - `app/products/[id]/page.tsx` — a "Print barcode label" button in the page header when the
+    loaded product has a barcode.
+  - `vitest.config.ts` — added `esbuild: { jsx: "automatic" }`. This is the first `.tsx` test file
+    in the project (`features/products/__tests__/BarcodeLabel.test.tsx`, 3 tests); without this,
+    esbuild falls back to the classic JSX transform and fails with "React is not defined" in any
+    file containing a JSX literal, since the project's own `tsconfig.json` uses `"jsx": "preserve"`
+    (correct for Next/SWC, but not read by vitest's esbuild pipeline). Needed for this test to run,
+    not just a style preference — future `.tsx` component tests benefit from the same fix.
+  - This is purely a **label-printing / barcode-generation** feature (turning a stored barcode
+    value into a scannable image). It does not touch barcode **scanning** or POS barcode-aware
+    search — `docs/API-GAPS.md`'s existing "Barcode lookup / barcode-aware search" row (backend gap:
+    `SearchTerm` doesn't match `Barcode`) is unrelated and still accurate; no change was needed
+    there.
+  - Re-verified clean: `frontend/inventory` typecheck/lint/test(15/15)/build(11/11 routes) all
+    pass.
+
+### Remaining tasks (unchanged from §I, still blocked on a `dotnet` + Docker environment)
+
+Items 1–4 and 6 from §I's "Remaining tasks" list are unchanged. Item 5 (thermal printing +
+barcode generation) is now **fully shipped** on the frontend side — thermal receipt printing in
+the prior session, barcode label generation this session. The only related item still open is the
+backend piece already tracked in `docs/API-GAPS.md` (wiring `Barcode` into the search filter, or
+exposing `GetByBarcodeAsync`), which needs `dotnet` to build/verify and was out of scope for a
+`node`-only session.
+
+### Exact next command
+
+**If continuing in a `node`-only sandbox** (no `dotnet`): there is no further frontend-only item
+queued in §I's original list — everything reachable without a backend has now been shipped
+(receipt printing, barcode generation). Confirm with the user before picking new frontend-only
+scope; don't invent new feature work not requested.
+
+**If continuing with `dotnet` + Docker available** (needed for everything else on this list):
+```
+cd enterprise-pos-inventory
+docker-compose up -d
+dotnet restore EnterprisePOS.sln && dotnet build EnterprisePOS.sln
+```
+Then follow `docs/ROADMAP-v3.0.md` Phase 1 exit criteria before starting Phase 2 (auth/tenancy),
+and pick up the barcode-search backend gap in `docs/API-GAPS.md` as a small, high-value fix along
+the way.
+
+### Suggested commit message for this session
+
+```
+feat(inventory): add barcode label generation (form preview, list action,
+detail print); test: enable automatic JSX runtime for vitest
+
+- package.json: add jsbarcode (runtime) and @types/jsbarcode (dev)
+- features/products/components/BarcodeLabel.tsx: new — Code128 SVG barcode
+  renderer for Product.Barcode, with empty/error states
+- features/products/components/BarcodeLabelModal.tsx: new — print-friendly
+  label modal, reusing the Receipt.tsx print-CSS pattern
+- features/products/components/ProductForm.tsx: live barcode preview
+- app/products/page.tsx: per-row "Label" action when a barcode exists
+- app/products/[id]/page.tsx: "Print barcode label" header action
+- vitest.config.ts: esbuild.jsx = "automatic" (first .tsx test file in the
+  project needed this; classic transform failed with "React is not defined")
+- features/products/__tests__/BarcodeLabel.test.tsx: new, 3 tests
+- AI-HANDOVER.md: §C checklist row + new §J session addendum
+
+Verified: frontend/inventory passes typecheck/lint/test(15/15)/build(11/11
+routes). frontend/pos and services/* untouched this session.
 ```

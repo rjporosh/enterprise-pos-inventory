@@ -9,6 +9,8 @@ import {
   productRemoveReset,
   productsRequested,
 } from "@/features/products/slice";
+import { BarcodeLabelModal } from "@/features/products/components/BarcodeLabelModal";
+import { ProductListItem } from "@/lib/api/products";
 import {
   Badge,
   Button,
@@ -33,6 +35,7 @@ export default function ProductsPage() {
   const [isActive, setIsActive] = useState<string>("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [pendingDeleteName, setPendingDeleteName] = useState<string>("");
+  const [labelProduct, setLabelProduct] = useState<ProductListItem | null>(null);
 
   function load(overrides: Partial<typeof params> = {}) {
     dispatch(
@@ -157,6 +160,11 @@ export default function ProductsPage() {
                       </td>
                       <td>
                         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          {p.barcode && (
+                            <Button size="sm" variant="ghost" onClick={() => setLabelProduct(p)}>
+                              Label
+                            </Button>
+                          )}
                           <Button size="sm" variant="ghost" onClick={() => router.push(`/products/${p.id}`)}>
                             Edit
                           </Button>
@@ -195,6 +203,15 @@ export default function ProductsPage() {
           loading={removeState.status === "saving"}
           onConfirm={() => dispatch(productRemoveRequested(pendingDeleteId))}
           onCancel={() => setPendingDeleteId(null)}
+        />
+      )}
+
+      {labelProduct && labelProduct.barcode && (
+        <BarcodeLabelModal
+          productName={labelProduct.name}
+          sku={labelProduct.sku}
+          barcode={labelProduct.barcode}
+          onClose={() => setLabelProduct(null)}
         />
       )}
     </>
