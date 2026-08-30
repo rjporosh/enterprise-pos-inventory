@@ -417,3 +417,92 @@ detail print); test: enable automatic JSX runtime for vitest
 Verified: frontend/inventory passes typecheck/lint/test(15/15)/build(11/11
 routes). frontend/pos and services/* untouched this session.
 ```
+
+## K. Frontend-only checkpoint — 2026-08-30 (read this first if you are the next agent)
+
+This section is the authoritative summary of what a `node`-only sandbox (no `.NET` SDK, no
+Docker) was able to complete and verify across this and the prior session, and exactly what is
+blocked pending a capable environment. It supersedes §I/§J for a quick status check; §I/§J remain
+as the detailed session-by-session record.
+
+### Completed and verified (frontend-only, real build/test/runtime evidence)
+
+- **POS thermal receipt printing, 58mm/80mm paper profiles** — `TerminalConfig.receiptPaperWidthMm`,
+  Setup page selector, `@page`/font-size print profiles in `Receipt.tsx`. Verified:
+  `frontend/pos` install/typecheck/lint/test(9/9)/build(7/7 routes) — see §I.
+- **Inventory barcode label generation** — live form preview, list "Label" action, detail/edit
+  "Print barcode label" button, via `jsbarcode` (Code128 SVG). Verified: `frontend/inventory`
+  install/typecheck/lint/test(15/15)/build(11/11 routes) — see §J.
+- Both features are committed: `5d80db6` (receipt printing) and `c0e7237` (barcode generation) on
+  `main`. `git log --oneline -20` shows the full recent history including these two commits.
+
+### Not started / blocked by environment
+
+The following require `.NET` SDK, Docker, Docker Compose, and PostgreSQL access, none of which
+exist in this sandbox (`which dotnet docker docker-compose` all fail). **None of this has been
+attempted, and no backend build/test/runtime result has been fabricated:**
+
+```text
+Blocked by environment:
+- backend build/runtime verification (dotnet restore/build/test has never been run this session
+  or the prior one — services/* has not been touched by either)
+- API Gateway (existence/completeness not verified — needs inspection with dotnet available)
+- auth-service integration into frontend/pos and frontend/inventory
+- notification-service integration into either frontend app
+- tenancy implementation/verification (server-side isolation cannot be tested without a running
+  backend + database)
+- licensing/subscription/trial engine (prior-session finding: does not exist in any form beyond a
+  marker interface — needs re-verification against actual code once dotnet is available, not
+  just trusted from this note)
+- enterprise database seeding (needs `dotnet ef` against a live Postgres)
+- backend barcode-search fix (`docs/API-GAPS.md`: `SearchTerm` does not match `Barcode` — fix is
+  trivial but requires building/testing the actual service)
+- Result-pattern standardization across services (requires inspecting actual service code with
+  dotnet tooling)
+- full Docker Compose stack verification
+- i18n/localization (frontend and backend) — not started
+```
+
+### Next environment must provide
+
+```text
+.NET SDK (version — check global.json / .csproj TargetFramework once inspecting)
+Docker
+Docker Compose
+PostgreSQL access (via docker-compose or otherwise)
+Node.js/npm (already required and available; frontend work depends on it too)
+```
+
+### Exact next-agent instructions
+
+Do repository inspection first — not blind implementation:
+
+```bash
+git status
+git branch --show-current
+git log --oneline -20
+docker --version
+docker compose version
+dotnet --version
+cd enterprise-pos-inventory
+docker-compose up -d
+dotnet restore EnterprisePOS.sln
+dotnet build EnterprisePOS.sln
+dotnet test
+```
+
+Then read, in this order, before touching any backend code:
+
+```text
+docs/ROADMAP-v3.0.md
+docs/API-GAPS.md
+AI-HANDOVER.md (this file, §K then §I/§J for detail)
+```
+
+Then inspect the actual source — existing `auth-service`/`notification-service` implementations,
+domain models, migrations, and API contracts — to determine what genuinely exists vs. what the
+docs claim, before designing or implementing anything. Proceed in the phase order already agreed
+with the user: Phase 1 exit criteria → Phase 2 auth/tenancy → barcode-search fix → auth/notification
+integration → licensing/subscription/trial engine → demo data seeding → full test/Docker
+verification → documentation update. Report against each phase's exit criteria with real
+build/test/runtime evidence before moving to the next.
