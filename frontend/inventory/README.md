@@ -22,7 +22,7 @@ cp .env.example .env.local   # then set NEXT_PUBLIC_INVENTORY_API_URL to your ru
 
 | Variable | Required | Description |
 |---|---|---|
-| `NEXT_PUBLIC_INVENTORY_API_URL` | Yes | Base URL of `inventory-service` (e.g. `http://localhost:5001`). No default is baked in — the app throws a clear config error if unset rather than silently failing requests. |
+| `NEXT_PUBLIC_INVENTORY_API_URL` | Yes | Base URL of `inventory-service` (e.g. `http://localhost:5002`). No default is baked in — the app throws a clear config error if unset rather than silently failing requests. |
 
 ## Development
 

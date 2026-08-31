@@ -506,3 +506,180 @@ with the user: Phase 1 exit criteria → Phase 2 auth/tenancy → barcode-search
 integration → licensing/subscription/trial engine → demo data seeding → full test/Docker
 verification → documentation update. Report against each phase's exit criteria with real
 build/test/runtime evidence before moving to the next.
+
+---
+
+## L. Phase 1 backend baseline — 2026-08-31 (read this first if you are the next agent)
+
+**This is the first session with a real `.NET 10 SDK (10.0.400)` and Docker available.** Every
+prior session's "cannot verify, no dotnet/Docker" caveat is now obsolete for anything covered
+below. §K above is now superseded for backend status; it remains accurate for the frontend-only
+history.
+
+### Headline result
+
+All four backend services (`auth-service`, `notification-service`, `pos-service`,
+`inventory-service`) now:
+- Build with **0 errors, 0 warnings** — including **0 unresolved NuGet security advisories**
+  (three had been silently `<NoWarn>`-suppressed rather than fixed; all three are now actually
+  fixed, see below).
+- Pass their full test suites: 48 (Inventory) + 18 (POS) unit tests, 7 (Inventory) + 1 (POS)
+  integration tests against a **real** Postgres/RabbitMQ/Redis stack, confirmed **repeatable**
+  (ran twice back-to-back with no flakiness — this matters because two of the bugs below only
+  reproduced on a *second* run against a populated database).
+- Have real, tool-generated EF Core migrations (no more hand-authored migrations missing
+  Designer.cs/ModelSnapshot pairs) applied to a live Postgres instance, schema-verified via `\dt`.
+- Run as Docker containers (new images for `auth-service`/`notification-service`; existing ones for
+  `pos-service`/`inventory-service` fixed) via a corrected root `docker-compose.yml`, all four
+  passing `GET /health` → 200.
+- Were smoke-tested end-to-end through a live container: created and listed a real product via
+  `inventory-api`'s HTTP API (not a unit test — an actual `curl` against the Docker container),
+  and confirmed `pos-api` correctly rejects an unseeded store/register with a structured
+  `ProblemDetails` error rather than crashing.
+
+**None of this was true at the start of the session.** Ten independent, previously-undetected bugs
+were found and fixed to get here — several severe enough to crash any real deployment. Full detail
+in `release-notes/release-notes.md`'s 2026-08-31 entry; summarized by severity:
+
+**Would have crashed or silently misconfigured a real deployment:**
+1. `InventoryService.API`/`PosService.API` used plain `Microsoft.NET.Sdk` instead of
+   `Microsoft.NET.Sdk.Web` → `appsettings.json` never shipped in the build/publish output → every
+   real run (Docker, published binary) started with zero configuration. **This is the single most
+   severe bug found** — it means no one had ever actually run either core service from a
+   Docker image or `dotnet publish` output before this session, only `dotnet run` from source.
+2. MediatR's `ValidationBehavior<,>` was `AddSingleton` while depending on FluentValidation's
+   Scoped `IValidator<T>` → every validated request throws in any environment with DI scope
+   validation on, which `docker-compose.yml`'s `ASPNETCORE_ENVIRONMENT=Development` triggers for
+   all four services.
+3. `GetAllProductsHandler` dereferences `p.Category.Name`/`p.Brand.Name`/`p.Unit.Symbol` but
+   `ProductRepository.GetPagedAsync` never `.Include()`d those navigations → `GET
+   /api/v1/products` (the products list) throws `NullReferenceException` the instant any product
+   exists. Only ever passed in earlier sessions because the test DB was empty.
+4. `auth-service`'s design-time `IDesignTimeDbContextFactory` didn't match its runtime
+   `AddDbContext` config (different DB name, missing `.MigrationsHistoryTable("__ef_migrations_history",
+   "auth")`) → following the documented `dotnet ef database update` workflow leaves the app's own
+   migration-history check empty, so it re-runs every migration against tables that already exist
+   on first boot → guaranteed crash-loop. Reproduced live: `auth-api` was crash-looping (exit 139)
+   until this was fixed and the (empty, no real data yet) `auth_service` database was recreated.
+5. `notification-service` throws `CultureNotFoundException` on **every** request in its Docker
+   image, including `/health` — the Alpine base image ships `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true`
+   with no ICU data, and this service does real culture-aware work for its English/Bangla
+   localization. Fixed with `apk add icu-libs` + turning invariant mode back off.
+
+**Security (silently suppressed via `<NoWarn>`, not actually fixed, until now):**
+6. `Microsoft.OpenApi` 2.0.0 (high, GHSA-v5pm-xwqc-g5wc) and `System.Security.Cryptography.Xml`
+   9.0.0 (8 separate high-severity DoS advisories) were shipping in `inventory-service`'s and
+   `pos-service`'s runtime output. Pinned to 2.7.5 / 9.0.18.
+7. Both integration test projects pinned `Testcontainers.*` to a version pulling vulnerable
+   `SSH.NET` (high, GHSA-q939-rpr3-3284), plus test-only `Azure.Identity`/`Microsoft.IdentityModel.*`
+   vulnerabilities from `Microsoft.AspNetCore.Mvc.Testing`. All pinned to patched versions.
+
+**Test infrastructure (masked real bugs by never actually running):**
+8. `WebApplicationFactory<object>` in both services' integration test bases — `object` has no
+   entry-point assembly, so every integration test threw `InvalidOperationException` before making
+   an HTTP call. Fixed by adding `public partial class Program {}` to both `Program.cs` files (the
+   standard ASP.NET Core fix) and referencing `Program` instead of `object`. **This is why bugs #2
+   and #3 above were never caught before** — the tests that would have caught them couldn't run at
+   all.
+9. A hand-authored migration's seed data used `DateTime.Parse("2025-01-01T00:00:00Z")`, which
+   despite the `Z` returns `DateTimeKind.Local` (classic .NET footgun) — fails against Postgres
+   `timestamptz` outside the UTC timezone. Fixed with explicit `DateTimeKind.Utc` construction.
+
+**Infrastructure-as-config:**
+10. Root `docker-compose.yml` defined only infra containers (Postgres/Redis/RabbitMQ/Seq), no
+    application services at all, referenced undeclared `redis-data`/`seq-data` volumes, and only
+    ever created one of the four databases needed. Rewritten: new
+    `scripts/postgres/init/01-create-databases.sh` creates all four DBs on first boot; all four
+    services now run as containers with correct env var names (see next point). Two more
+    per-service compose files had the *same* connection-string key bug exposed by #1's fix
+    (`ConnectionStrings__DefaultConnection`, which neither `Program.cs` ever reads — the real key
+    is `Database:ConnectionString`) and one had a wrong Docker build context (`context: .` instead
+    of `context: ../..`, meaning the Dockerfile's repo-root-relative `COPY` paths would never
+    resolve). `pos-service`'s standalone `docker-compose.yml` referenced a `rabbitmq` host with no
+    `rabbitmq` service defined. `inventory-service`'s `Dockerfile` had `ENV
+    ASPNETCORE_URLS=http+:8080` (missing `//`, a typo that happened to still partially resolve).
+    `services/notification-service/Dockerfile`'s build stage needed `apk add libc6-compat` — its
+    `Grpc.Tools`-generated `.proto` build step ships a glibc-linked `protoc` that can't run on
+    Alpine's musl libc without it (fails with a misleading "No such file or directory").
+
+**Lower severity, also fixed:** CORS `AllowedOrigins` on `pos-service`/`auth-service` pointed at
+Angular/Vite ports (4200/5173) left over from a different template project; `notification-service`
+had no CORS policy at all. All four now allow `localhost:3000`/`:3001` (the real Next.js apps'
+ports). `.gitignore`'s `.env.*` pattern was silently excluding `.env.example` from every commit —
+both frontend apps' example files (referenced by their own READMEs) had never actually been
+committed in any session; fixed the pattern and recreated both files. Both frontend READMEs had
+their example `NEXT_PUBLIC_*_API_URL` ports swapped relative to the rest of the repo's docs. Added
+`launchSettings.json` for `InventoryService.API`/`PosService.API` (ports 5002/5001, matching every
+other doc) — previously only `auth-service`/`notification-service` had one.
+
+### What genuinely is NOT done — don't re-derive this from hope, read `docs/API-GAPS.md`
+
+- **No API Gateway exists anywhere in the repo.** A prior message in this conversation's context
+  assumed a YARP gateway had been added — it has not. `grep -ril yarp` across the whole repo
+  returns nothing. This is genuinely Phase 3, not started.
+- `auth-service`/`notification-service` are still not integrated into either frontend app — no
+  login screen, no token storage, no notification bell/panel. `cashierId` in POS is still a raw
+  pasted GUID.
+- No license/subscription/trial/tenant-isolation code exists anywhere (re-confirmed, not
+  re-checked exhaustively this session — the prior sessions' repo-wide grep finding stands).
+- `notification-service`'s RabbitMQ `UpstreamBindings` config still lists bus-ticketing-domain
+  event names (`booking.events`, `payment.events`) — harmless (nothing publishes to them) but
+  copy-pasted from a template project, not real POS/Inventory event wiring. No inventory low-stock
+  → notification wiring exists.
+- Category/Brand/Unit/Warehouse/Store/Register CRUD still don't exist (per `docs/API-GAPS.md`,
+  unchanged this session) — the products list smoke test above worked *because* the earlier
+  `SeedInitialData` migration seeded 5 real units/categories/brands with known GUIDs; a real
+  operator still has no UI or endpoint to create their own.
+- Frontend apps were not touched, built, or pointed at a live backend this session.
+
+### Exact commands to reproduce this session's verification
+
+```bash
+cd enterprise-pos-inventory
+
+# Backend build/test
+dotnet build EnterprisePOS.sln                    # expect 0 errors, 0 warnings
+dotnet test EnterprisePOS.sln                     # expect 48+18 unit, 7+1 integration, all pass
+cd services/auth-service && dotnet build AuthService.sln && cd ../..
+cd services/notification-service && dotnet build NotificationService.sln && cd ../..
+
+# Docker full stack
+docker compose up -d                              # brings up postgres/redis/rabbitmq/seq + all 4 APIs
+docker compose ps                                 # all should show "Up" / healthy
+curl http://localhost:5100/health                 # auth-api      -> 200
+curl http://localhost:5300/health                 # notification  -> 200
+curl http://localhost:5002/health                 # inventory-api -> 200
+curl http://localhost:5001/health                 # pos-api       -> 200
+
+# Migrations (only needed against a fresh Postgres — the compose stack above
+# auto-creates all 4 databases via scripts/postgres/init/01-create-databases.sh,
+# but does NOT auto-apply migrations; run these once per fresh database)
+export PATH="$PATH:$HOME/.dotnet/tools"   # dotnet-ef global tool
+dotnet ef database update --project services/pos-service/src/PosService.Infrastructure --startup-project services/pos-service/src/PosService.API
+dotnet ef database update --project services/inventory-service/src/InventoryService.Infrastructure --startup-project services/inventory-service/src/InventoryService.API
+dotnet ef database update --project services/auth-service/src/AuthService.Infrastructure --startup-project services/auth-service/src/AuthService.Api
+dotnet ef database update --project services/notification-service/src/NotificationService.Infrastructure --startup-project services/notification-service/src/NotificationService.Api
+```
+
+### Exact next command
+
+Per `docs/ROADMAP-v3.0.md`'s "Delivery Order", the next items are (2) Auth + tenant isolation and
+(3) Gateway + rate limiting + resilience — both genuinely not started. Recommended order, since a
+gateway is much simpler to design correctly once you know what it's routing auth context *to*:
+
+1. **Design and build the YARP API Gateway** (new service, `services/gateway/` or
+   `gateway/` at repo root — decide based on whether it should be versioned/deployed like the other
+   four services). Routes to all 4 services, correlation ID propagation (the pattern already
+   exists in `shared/shared-infrastructure` — reuse it), consistent error mapping, health-aware
+   routing. This is pure addition, no risk to existing services.
+2. **Wire `auth-service` into both frontend apps** — shared JWT/refresh-token client, auth Redux
+   slice, route guards, derive `cashierId`/`userId` from the token instead of a pasted GUID.
+3. **Then** tenant isolation (`TenantId` on aggregates, tenant-scoped repositories, cross-tenant
+   IDOR tests) and the licensing/subscription/trial engine described in this conversation's
+   opening prompt (3-day trial, POS-only/Inventory-only/combined plans, product-count-based
+   tiers) — this is real new domain modeling, not integration, and should follow tenant isolation
+   since entitlements are naturally tenant-scoped.
+
+Do NOT re-verify Phase 1 from scratch — it's done and documented above with real evidence. Do
+re-run the build/test commands above once before starting new work, to confirm nothing regressed
+between sessions.

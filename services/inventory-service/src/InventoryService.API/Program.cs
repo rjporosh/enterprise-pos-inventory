@@ -144,3 +144,10 @@ app.MapGet("/api/v1/system/release", (IConfiguration configuration, IWebHostEnvi
 .Produces(200);
 
 app.Run();
+
+/// <summary>
+/// Exposes the top-level-statements-generated Program class (implicitly internal)
+/// as public, so <c>WebApplicationFactory&lt;Program&gt;</c> can reference this
+/// assembly's entry point from the integration test project.
+/// </summary>
+public partial class Program { }

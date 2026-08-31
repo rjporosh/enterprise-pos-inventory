@@ -81,6 +81,18 @@ if (jwtSection.Exists())
 }
 builder.Services.AddAuthorization();
 
+// ---------- CORS ----------
+// Configured origins only (no AllowAnyOrigin) — this service is called
+// directly by the browser for the in-app notification bell/panel.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowConfiguredOrigins", policy =>
+    {
+        var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+        policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod();
+    });
+});
+
 // ---------- Rate limiting ----------
 builder.Services.AddRateLimiter(options =>
 {
@@ -180,6 +192,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseCors("AllowConfiguredOrigins");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

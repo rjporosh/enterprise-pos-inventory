@@ -23,17 +23,14 @@ namespace AuthService.IntegrationTests;
 /// </summary>
 public sealed class AuthApiTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("auth_service_test")
         .Build();
 
-    private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder()
-        .WithImage("rabbitmq:3.13-management-alpine")
+    private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder("rabbitmq:3.13-management-alpine")
         .Build();
 
-    private readonly RedisContainer _redis = new RedisBuilder()
-        .WithImage("redis:7.4-alpine")
+    private readonly RedisContainer _redis = new RedisBuilder("redis:7.4-alpine")
         .Build();
 
     private WebApplicationFactory<Program>? _factory;

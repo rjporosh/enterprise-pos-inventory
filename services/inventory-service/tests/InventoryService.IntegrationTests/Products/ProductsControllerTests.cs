@@ -6,30 +6,42 @@ using Xunit;
 
 namespace InventoryService.IntegrationTests.Products;
 
-public class ProductsControllerTests : IClassFixture<WebApplicationFactory<object>>
+public class ProductsControllerTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    // Seeded by the InventoryService.Infrastructure "SeedInitialData" migration — real rows that
+    // exist in every environment this migration has run against, unlike a random Guid.NewGuid()
+    // which has no matching category/brand/unit row and trips the products table's FK constraints.
+    private static readonly Guid SeededCategoryId = new("20000000-0000-0000-0000-000000000001");
+    private static readonly Guid SeededBrandId = new("30000000-0000-0000-0000-000000000001");
+    private static readonly Guid SeededUnitId = new("10000000-0000-0000-0000-000000000001");
+
     private readonly HttpClient _client;
     private readonly Guid _categoryId;
     private readonly Guid _brandId;
     private readonly Guid _unitId;
 
-    public ProductsControllerTests(WebApplicationFactory<object> factory)
+    public ProductsControllerTests(WebApplicationFactory<Program> factory)
     {
         _client = factory.CreateClient();
-        _categoryId = Guid.NewGuid();
-        _brandId = Guid.NewGuid();
-        _unitId = Guid.NewGuid();
+        _categoryId = SeededCategoryId;
+        _brandId = SeededBrandId;
+        _unitId = SeededUnitId;
     }
 
     [Fact]
     public async Task CreateProduct_WithValidData_ShouldReturn201()
     {
+        // Sku/Barcode are unique-indexed and this suite runs against a real, persistent
+        // Postgres database with no reset-between-runs strategy (see docs/API-GAPS.md /
+        // AI-HANDOVER.md — Respawn-based isolation is tracked as future work), so a fixed
+        // literal would only pass once; a per-run suffix keeps the test repeatable.
+        var suffix = Guid.NewGuid().ToString("N")[..8];
         var request = new
         {
             Name = "Test Product",
             Description = "Test Description",
-            Sku = "TEST-001",
-            Barcode = "123456",
+            Sku = $"TEST-{suffix}",
+            Barcode = suffix,
             CategoryId = _categoryId,
             BrandId = _brandId,
             UnitId = _unitId,
@@ -89,7 +101,11 @@ public class ProductsControllerTests : IClassFixture<WebApplicationFactory<objec
     [Fact]
     public async Task DeleteProduct_WithInvalidId_ShouldReturn404()
     {
-        var response = await _client.DeleteAsync("/api/v1/products/00000000-0000-0000-0000-000000000000");
+        // DeleteProductValidator rejects Guid.Empty with a 400 (malformed input) before the
+        // handler ever runs a lookup — that's correct, deliberate behavior (see
+        // DeleteProductValidator.cs), not the "not found" case this test exercises. A
+        // well-formed Guid that simply has no matching row is the right "invalid id" fixture.
+        var response = await _client.DeleteAsync($"/api/v1/products/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
     }

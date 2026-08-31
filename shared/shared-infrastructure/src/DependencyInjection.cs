@@ -25,7 +25,14 @@ public static class DependencyInjection
             cfg.RegisterServicesFromAssemblies(assemblies.ToArray());
         });
 
-        services.AddSingleton(
+        // Scoped, not Singleton: this behavior depends on IValidator<T>, which
+        // AddValidatorsFromAssemblies registers as Scoped. A Singleton pipeline
+        // behavior can't consume a Scoped dependency — DI throws
+        // "Cannot consume scoped service ... from singleton" the moment scope
+        // validation is enabled (e.g. ASPNETCORE_ENVIRONMENT=Development, which
+        // is what docker-compose.yml sets for every service), turning every
+        // validated MediatR request into a 400.
+        services.AddScoped(
             typeof(IPipelineBehavior<,>),
             typeof(Behaviors.ValidationBehavior<,>));
 

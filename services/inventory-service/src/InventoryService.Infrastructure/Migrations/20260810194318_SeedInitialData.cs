@@ -14,11 +14,11 @@ namespace InventoryService.Infrastructure.Migrations
                 columns: new[] { "id", "created_at", "created_by", "deleted_at", "deleted_by", "description", "is_active", "is_deleted", "name", "symbol", "updated_at", "updated_by" },
                 values: new object[,]
                 {
-                    { new Guid("10000000-0000-0000-0000-000000000001"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Piece", true, false, "Piece", "pcs", null, null },
-                    { new Guid("10000000-0000-0000-0000-000000000002"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Kilogram", true, false, "Kilogram", "kg", null, null },
-                    { new Guid("10000000-0000-0000-0000-000000000003"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Liter", true, false, "Liter", "l", null, null },
-                    { new Guid("10000000-0000-0000-0000-000000000004"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Box", true, false, "Box", "box", null, null },
-                    { new Guid("10000000-0000-0000-0000-000000000005"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Meter", true, false, "Meter", "m", null, null }
+                    { new Guid("10000000-0000-0000-0000-000000000001"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Piece", true, false, "Piece", "pcs", null, null },
+                    { new Guid("10000000-0000-0000-0000-000000000002"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Kilogram", true, false, "Kilogram", "kg", null, null },
+                    { new Guid("10000000-0000-0000-0000-000000000003"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Liter", true, false, "Liter", "l", null, null },
+                    { new Guid("10000000-0000-0000-0000-000000000004"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Box", true, false, "Box", "box", null, null },
+                    { new Guid("10000000-0000-0000-0000-000000000005"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Meter", true, false, "Meter", "m", null, null }
                 });
 
             migrationBuilder.InsertData(
@@ -27,11 +27,11 @@ namespace InventoryService.Infrastructure.Migrations
                 columns: new[] { "id", "created_at", "created_by", "deleted_at", "deleted_by", "description", "is_active", "is_deleted", "name", "parent_category_id", "sort_order", "updated_at", "updated_by" },
                 values: new object[,]
                 {
-                    { new Guid("20000000-0000-0000-0000-000000000001"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "All products", true, false, "All", null, 0, null, null },
-                    { new Guid("20000000-0000-0000-0000-000000000002"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Grocery items", true, false, "Grocery", new Guid("20000000-0000-0000-0000-000000000001"), 1, null, null },
-                    { new Guid("20000000-0000-0000-0000-000000000003"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Electronics", true, false, "Electronics", new Guid("20000000-0000-0000-0000-000000000001"), 2, null, null },
-                    { new Guid("20000000-0000-0000-0000-000000000004"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Clothing", true, false, "Clothing", new Guid("20000000-0000-0000-0000-000000000001"), 3, null, null },
-                    { new Guid("20000000-0000-0000-0000-000000000005"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Beverages", true, false, "Beverages", new Guid("20000000-0000-0000-0000-000000000002"), 1, null, null }
+                    { new Guid("20000000-0000-0000-0000-000000000001"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "All products", true, false, "All", null, 0, null, null },
+                    { new Guid("20000000-0000-0000-0000-000000000002"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Grocery items", true, false, "Grocery", new Guid("20000000-0000-0000-0000-000000000001"), 1, null, null },
+                    { new Guid("20000000-0000-0000-0000-000000000003"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Electronics", true, false, "Electronics", new Guid("20000000-0000-0000-0000-000000000001"), 2, null, null },
+                    { new Guid("20000000-0000-0000-0000-000000000004"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Clothing", true, false, "Clothing", new Guid("20000000-0000-0000-0000-000000000001"), 3, null, null },
+                    { new Guid("20000000-0000-0000-0000-000000000005"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Beverages", true, false, "Beverages", new Guid("20000000-0000-0000-0000-000000000002"), 1, null, null }
                 });
 
             migrationBuilder.InsertData(
@@ -40,9 +40,9 @@ namespace InventoryService.Infrastructure.Migrations
                 columns: new[] { "id", "created_at", "created_by", "deleted_at", "deleted_by", "description", "is_active", "is_deleted", "name", "updated_at", "updated_by", "website" },
                 values: new object[,]
                 {
-                    { new Guid("30000000-0000-0000-0000-000000000001"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Generic brand", true, false, "Generic", null, null, null },
-                    { new Guid("30000000-0000-0000-0000-000000000002"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Premium electronics", true, false, "TechPro", null, null, "https://techpro.example.com" },
-                    { new Guid("30000000-0000-0000-0000-000000000003"), DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, "Clothing brand", true, false, "StyleWear", null, null, null }
+                    { new Guid("30000000-0000-0000-0000-000000000001"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Generic brand", true, false, "Generic", null, null, null },
+                    { new Guid("30000000-0000-0000-0000-000000000002"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Premium electronics", true, false, "TechPro", null, null, "https://techpro.example.com" },
+                    { new Guid("30000000-0000-0000-0000-000000000003"), new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, "Clothing brand", true, false, "StyleWear", null, null, null }
                 });
 
             migrationBuilder.InsertData(
@@ -51,8 +51,8 @@ namespace InventoryService.Infrastructure.Migrations
                 columns: new[] { "id", "address", "city", "contact_name", "country", "created_at", "created_by", "deleted_at", "deleted_by", "is_active", "is_default", "is_deleted", "name", "phone", "updated_at", "updated_by" },
                 values: new object[,]
                 {
-                    { new Guid("40000000-0000-0000-0000-000000000001"), "123 Main St", "Dhaka", "Warehouse Manager", "Bangladesh", DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, true, true, false, "Main Warehouse", "+8801700000001", null, null },
-                    { new Guid("40000000-0000-0000-0000-000000000002"), "456 Side St", "Chittagong", "Branch Manager", "Bangladesh", DateTime.Parse("2025-01-01T00:00:00Z"), null, null, null, true, false, false, "Branch Warehouse", "+8801700000002", null, null }
+                    { new Guid("40000000-0000-0000-0000-000000000001"), "123 Main St", "Dhaka", "Warehouse Manager", "Bangladesh", new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, true, true, false, "Main Warehouse", "+8801700000001", null, null },
+                    { new Guid("40000000-0000-0000-0000-000000000002"), "456 Side St", "Chittagong", "Branch Manager", "Bangladesh", new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, null, null, true, false, false, "Branch Warehouse", "+8801700000002", null, null }
                 });
         }
 

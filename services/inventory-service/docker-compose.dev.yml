@@ -1,13 +1,22 @@
 services:
   inventory-api:
     build:
-      context: .
-      dockerfile: Dockerfile
+      # Repo root, not the service directory: the Dockerfile's COPY paths
+      # (e.g. "services/inventory-service/src/...") are written relative to
+      # the solution root, matching how it's built from docker-compose.yml.
+      context: ../..
+      dockerfile: services/inventory-service/Dockerfile
     ports:
       - "5002:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=${INVENTORY_DB_CONNECTION}
+      # Must be Database__ConnectionString — matches Program.cs's
+      # builder.Configuration["Database:ConnectionString"] read. The previous
+      # ConnectionStrings__DefaultConnection key was never read by the app at
+      # all, so the container crashed on every request with
+      # "Database:ConnectionString is not configured."
+      - Database__Provider=PostgreSQL
+      - Database__ConnectionString=${INVENTORY_DB_CONNECTION}
       - Redis__ConnectionString=${REDIS_CONNECTION}
       - RabbitMQ__Host=rabbitmq
       - ServiceName=inventory-service

@@ -3,7 +3,7 @@
 
 **Version:** 3.0
 **Status:** Active — Production Hardening Plan
-**Last Updated:** August 26, 2026
+**Last Updated:** August 31, 2026
 
 > Status in this document is based on the repository, committed handover documents and Git history
 > available at the time of update. A feature is **not** marked production-ready merely because code
@@ -28,6 +28,12 @@
 - [x] Load-test scaffolding
 - [x] POS integration-test scaffolding
 - [x] Previous build-error/warning fix passes
+- [x] `auth-service` and `notification-service` exist as full services (added prior to 2026-08-31,
+      confirmed and hardened this session) — RBAC/JWT auth, OTP, audit logs; notification
+      send/list/templates/preferences, Email/SMS/Push channel abstractions, outbox pattern
+- [x] All 4 services build 0/0, test green, migrate cleanly, and run in Docker with passing health
+      checks — first full, real verification pass across the whole backend (2026-08-31, see
+      `release-notes.md`/`AI-HANDOVER.md` §L for the 10 bugs found and fixed to get here)
 
 ### Frontend MVP
 - [x] React 19 + Next.js POS app
@@ -45,11 +51,18 @@
 - [x] Typecheck/lint/build verification for the frontend MVP
 
 ## Not yet proven
-- [ ] Third build with 0 errors / 0 warnings after the last backend fixes
-- [ ] Real backend + frontend end-to-end runtime
-- [ ] Production authentication/authorization
+- [x] Third build with 0 errors / 0 warnings after the last backend fixes — done 2026-08-31, all
+      four services (`auth`, `notification`, `pos`, `inventory`), including 0 known-vulnerable
+      dependencies (3 previously-suppressed NuGet advisories actually fixed, not just silenced)
+- [~] Real backend + frontend end-to-end runtime — backend-to-backend verified 2026-08-31 (all 4
+      services run in Docker, pass health checks, a real product create+list round-trip was
+      smoke-tested through a live container); frontend apps have not yet been pointed at a running
+      backend in this environment — still the next concrete step
+- [ ] Production authentication/authorization — `auth-service` exists and now builds/runs/migrates
+      cleanly (2026-08-31), but is not integrated into either frontend app
 - [ ] Production tenant isolation
-- [ ] Gateway/BFF
+- [ ] Gateway/BFF — confirmed 2026-08-31: does not exist anywhere in the repo (no YARP or other
+      gateway project). An earlier assumption that one had been added was incorrect.
 - [ ] Subscription/billing/licensing
 - [ ] Entitlement/quota enforcement
 - [ ] Barcode generation/scanning end-to-end
@@ -61,7 +74,12 @@
 - [ ] Full reporting suite
 - [ ] Expenses/profit accounting
 - [ ] Offline transactional storage + synchronization
-- [ ] Notification service (email/SMS/web)
+- [~] Notification service (email/SMS/web) — `notification-service` exists, now builds/runs/
+      migrates cleanly and passes health checks in Docker (2026-08-31); not integrated into either
+      frontend app, and its RabbitMQ upstream bindings still reference bus-ticketing-domain event
+      names (`booking.events`, `payment.events`) left over from a template project — harmless
+      (nothing publishes to them) but misleading, and a real POS/Inventory event wiring (e.g.
+      low-stock, trial-expiry) has not been built
 - [ ] Production CI/CD
 - [ ] Backup/restore verification
 - [ ] Production security/load/chaos testing
@@ -69,22 +87,27 @@
 ---
 
 # Phase 1 — Build & Contract Stabilization
-**Status: IN PROGRESS / NEXT**
+**Status: CORE DONE 2026-08-31 — a few items remain (see unchecked below)**
 
 ## Goal
 Create a clean baseline before adding large commercial features.
 
 ### Backend
-- [ ] `dotnet restore EnterprisePOS.sln`
-- [ ] `dotnet build EnterprisePOS.sln`
-- [ ] Achieve 0 errors
-- [ ] Achieve 0 warnings
-- [ ] `dotnet test EnterprisePOS.sln`
-- [ ] Regenerate hand-authored EF migrations with real `dotnet ef`
-- [ ] Apply migrations to clean databases
-- [ ] Verify database schema
-- [ ] Resolve duplicated `BaseEntity` design intentionally
-- [ ] Review API response/error contracts
+- [x] `dotnet restore EnterprisePOS.sln`
+- [x] `dotnet build EnterprisePOS.sln`
+- [x] Achieve 0 errors — all 4 services (`EnterprisePOS.sln` covers pos+inventory;
+      `auth-service`/`notification-service` each have their own `.sln`, built separately)
+- [x] Achieve 0 warnings — including 0 unresolved security advisories (see release-notes.md
+      2026-08-31 entry: 3 advisories had been `<NoWarn>`-suppressed rather than fixed; now fixed)
+- [x] `dotnet test EnterprisePOS.sln` — 48+18 unit, 7+1 integration, all pass, repeatably
+- [x] Regenerate hand-authored EF migrations with real `dotnet ef` — pos-service `InitialCreate`
+      (folded `AddDailySalesReport` into one clean migration) and inventory-service
+      `AddIntegrationEventInbox`, both now have real Designer.cs/ModelSnapshot pairs
+- [x] Apply migrations to clean databases — all 4 services, against a live Postgres via Docker
+- [x] Verify database schema — confirmed via `\dt` for all 4 databases
+- [ ] Resolve duplicated `BaseEntity` design intentionally — not revisited this session, still open
+- [ ] Review API response/error contracts — `docs/API-CONTRACT.md` vs. real controllers still
+      disagree per `docs/API-GAPS.md` §1; not reconciled this session
 - [ ] Review versioning
 - [ ] Review pagination/filter/sort
 - [ ] Review correlation ID propagation
@@ -95,10 +118,13 @@ Create a clean baseline before adding large commercial features.
 - [ ] Add ADR for offline synchronization
 
 ### Exit criteria
-- [ ] Clean build: 0/0
-- [ ] Full tests green
-- [ ] Clean database migration succeeds
-- [ ] No known contract mismatch between frontend and backend
+- [x] Clean build: 0/0 — all 4 services
+- [x] Full tests green — unit + integration, all 4 services buildable/testable (auth/notification
+      integration tests need Docker for Testcontainers; not run in CI yet, only confirmed to build)
+- [x] Clean database migration succeeds — all 4 services, verified against live Postgres
+- [ ] No known contract mismatch between frontend and backend — `docs/API-GAPS.md` still lists
+      real gaps (category/brand/unit/warehouse/store/register CRUD, barcode search); frontend was
+      not touched this session
 
 ---
 

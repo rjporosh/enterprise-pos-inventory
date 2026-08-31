@@ -1,11 +1,16 @@
-version: "3.8"
+
+# Full-stack local development compose file: shared Postgres/Redis/RabbitMQ/Seq
+# plus all four backend services. Each service also ships its own standalone
+# services/<name>/docker-compose.yml with an isolated database/broker on
+# different host ports, for working on one service in isolation — this file
+# is for running the whole platform together (e.g. to exercise the POS ->
+# Inventory RabbitMQ integration, or auth/notification end-to-end).
 
 volumes:
-  pos-db-data:
-  inventory-db-data:
-  pos-redis-data:
-  inventory-redis-data:
+  postgres-data:
+  redis-data:
   rabbitmq-data:
+  seq-data:
 
 services:
   postgres:
@@ -19,7 +24,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pos-db-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
       - ./scripts/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -77,6 +82,119 @@ services:
       - "5341:80"
     volumes:
       - seq-data:/data
+    networks:
+      - enterprise-network
+
+  inventory-api:
+    build:
+      context: .
+      dockerfile: services/inventory-service/Dockerfile
+    container_name: inventory-api
+    restart: always
+    ports:
+      - "5002:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Database__Provider=PostgreSQL
+      - Database__ConnectionString=Host=postgres;Port=5432;Database=inventory_db;Username=postgres;Password=postgres
+      - Redis__ConnectionString=redis:6379
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - Cors__AllowedOrigins__0=http://localhost:3000
+      - Cors__AllowedOrigins__1=http://localhost:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - enterprise-network
+
+  pos-api:
+    build:
+      context: .
+      dockerfile: services/pos-service/Dockerfile
+    container_name: pos-api
+    restart: always
+    ports:
+      - "5001:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Database__Provider=PostgreSQL
+      - Database__ConnectionString=Host=postgres;Port=5432;Database=pos_db;Username=postgres;Password=postgres
+      - Redis__ConnectionString=redis:6379
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - Cors__AllowedOrigins__0=http://localhost:3000
+      - Cors__AllowedOrigins__1=http://localhost:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - enterprise-network
+
+  auth-api:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: auth-api
+    restart: always
+    ports:
+      - "5100:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Database__Provider=Postgres
+      - ConnectionStrings__AuthDb=Host=postgres;Port=5432;Database=auth_service;Username=postgres;Password=postgres
+      - Redis__ConnectionString=redis:6379
+      - RabbitMq__HostName=rabbitmq
+      - RabbitMq__Port=5672
+      - RabbitMq__UserName=guest
+      - RabbitMq__Password=guest
+      - Cors__AllowedOrigins__0=http://localhost:3000
+      - Cors__AllowedOrigins__1=http://localhost:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - enterprise-network
+
+  notification-api:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: notification-api
+    restart: always
+    ports:
+      - "5300:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Database__Provider=Postgres
+      - ConnectionStrings__NotificationDb=Host=postgres;Port=5432;Database=notification_service;Username=postgres;Password=postgres
+      - RabbitMq__HostName=rabbitmq
+      - RabbitMq__Port=5672
+      - RabbitMq__UserName=guest
+      - RabbitMq__Password=guest
+      - Cors__AllowedOrigins__0=http://localhost:3000
+      - Cors__AllowedOrigins__1=http://localhost:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - enterprise-network
 

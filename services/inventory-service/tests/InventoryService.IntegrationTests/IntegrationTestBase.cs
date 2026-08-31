@@ -6,11 +6,11 @@ namespace InventoryService.IntegrationTests;
 
 public class IntegrationTestBase : IAsyncLifetime
 {
-    private readonly WebApplicationFactory<object> _factory;
+    private readonly WebApplicationFactory<Program> _factory;
 
     public IntegrationTestBase()
     {
-        _factory = new WebApplicationFactory<object>()
+        _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 builder.ConfigureServices(services =>

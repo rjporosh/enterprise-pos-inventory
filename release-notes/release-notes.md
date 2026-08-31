@@ -316,3 +316,119 @@ license/subscription/trial engine, enterprise demo data seeding. See `AI-HANDOVE
 full breakdown.
 
 Trust `AI-HANDOVER.md` and `git log` over this entry for anything more recent.
+
+## 2026-08-31 session — Phase 1 build/test/migration/Docker baseline (first session with real dotnet + Docker)
+
+**Environment note:** for the first time across all sessions recorded in this file, the sandbox had
+a real **.NET 10 SDK (10.0.400) and Docker** available. Every fix below was verified against real
+`dotnet build`/`dotnet test`/`dotnet ef`/`docker compose` runs, not read-only source inspection —
+see `AI-HANDOVER.md` §L for the full list with exact evidence.
+
+**Headline result:** all four services (`auth-service`, `notification-service`, `pos-service`,
+`inventory-service`) now build with **0 errors / 0 warnings** (including 0 known-vulnerable
+dependencies — 3 separate NuGet security advisories were silently `<NoWarn>`-suppressed rather than
+fixed; all three are now actually fixed), all unit tests pass (48 + 18), all integration tests pass
+against a real Postgres/RabbitMQ/Redis stack (7 + 1) **repeatably** (re-run twice with no
+flakiness), and all four services run as Docker containers via a corrected root
+`docker-compose.yml`, passing `/health` on every one of them.
+
+**This was not a clean bill of health going in.** Ten independent, previously-undetected bugs were
+found and fixed this session — several of them severe enough that they would have blocked or
+crashed a real deployment. In order of how they'd surface to a real user:
+
+1. **`InventoryService.API`/`PosService.API` used the plain `Microsoft.NET.Sdk` instead of
+   `Microsoft.NET.Sdk.Web`.** `appsettings.json` was never copied to the build/publish output for
+   either service — every real run (published binary, Docker container) would start with **zero
+   configuration** and crash on the first request needing `Database:ConnectionString`. This is the
+   single most severe bug found: it affected both core services and every way of running them
+   except `dotnet run` from source with `ASPNETCORE_ENVIRONMENT` unset.
+2. **MediatR's `ValidationBehavior<,>` pipeline was registered `AddSingleton` while depending on
+   FluentValidation's `IValidator<T>`, which is Scoped.** This throws
+   `"Cannot consume scoped service ... from singleton"` for *every* validated request the moment
+   DI scope validation is enabled — which is exactly what happens in the `Development` environment
+   that `docker-compose.yml` sets for every service. Fixed to `AddScoped`.
+3. **`GetAllProductsHandler`'s DTO mapping dereferenced `p.Category.Name`/`p.Brand.Name`/
+   `p.Unit.Symbol` directly, but `ProductRepository.GetPagedAsync` never `.Include()`d those
+   navigation properties.** `GET /api/v1/products` — the products list, one of the most-hit
+   endpoints in the whole product — throws `NullReferenceException` for every row the instant a
+   real product exists. Only passed by accident in earlier sessions because the test database was
+   empty. Fixed with the missing `.Include()` calls.
+4. **`auth-service`'s design-time `IDesignTimeDbContextFactory` didn't match its runtime
+   `AddDbContext` registration** (different database name, and missing the
+   `.MigrationsHistoryTable("__ef_migrations_history", "auth")` override). Following the
+   documented `dotnet ef database update` workflow applies migrations tracked in
+   `public.__EFMigrationsHistory`; the running app checks `auth.__ef_migrations_history`, finds it
+   empty, and tries to re-run every migration against tables that already exist — a **guaranteed
+   crash-loop on first boot** after any by-the-book deploy. Fixed by aligning the design-time
+   factory with the runtime configuration.
+5. **`notification-service` throws `CultureNotFoundException` on every single request in its Docker
+   image**, including `/health`. The `aspnet:10.0-alpine` base image ships with
+   `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true` and no ICU data by default; this service's
+   `LocalizationMiddleware`/`ResourceLocalizationService` do real culture-aware work
+   (English/Bangla). Fixed by installing `icu-libs` and turning invariant mode back off in the
+   Dockerfile.
+6. **`Microsoft.OpenApi` 2.0.0 (high-severity, GHSA-v5pm-xwqc-g5wc) and `System.Security.Cryptography.Xml`
+   9.0.0 (8 separate high-severity DoS advisories) were shipped in `inventory-service`'s and
+   `pos-service`'s runtime output**, silently hidden behind `<NoWarn>NU1903</NoWarn>` rather than
+   fixed. Pinned both to patched versions (2.7.5 and 9.0.18) and removed the suppression.
+7. **Both integration test projects' `Testcontainers.*` packages were pinned to 4.0.0**, which pulls
+   a vulnerable `SSH.NET` (high severity, GHSA-q939-rpr3-3284), also hidden behind `<NoWarn>`.
+   Bumped to 4.14.0; fixed the resulting obsolete-constructor warnings from the version bump.
+   Test-only `Azure.Identity`/`Microsoft.IdentityModel.*` transitive vulnerabilities (pulled in by
+   `Microsoft.AspNetCore.Mvc.Testing`) were fixed the same way.
+8. **`WebApplicationFactory<object>` in both services' integration test base classes** — `object`'s
+   assembly has no entry point, so every integration test using it threw
+   `InvalidOperationException` before making a single HTTP call. Fixed by exposing the top-level
+   `Program` class as `public partial class Program {}` in both `Program.cs` files (the standard
+   fix for this well-known ASP.NET Core minimal-API testing gap) and referencing `Program` instead
+   of `object`.
+9. **A hand-authored EF migration's seed data used `DateTime.Parse("2025-01-01T00:00:00Z")`**,
+   which despite the `Z` suffix returns `DateTimeKind.Local` from `DateTime.Parse` (a well-known
+   .NET footgun) — Npgsql then refuses to write it to a `timestamptz` column with
+   `"a UTC DateTime is required"` on any machine not running in the UTC timezone. Fixed with
+   explicit `new DateTime(..., DateTimeKind.Utc)`.
+10. **`docker-compose.yml` at the repo root only defined infrastructure (Postgres/Redis/RabbitMQ/Seq)
+    with no application containers at all**, referenced undeclared `redis-data`/`seq-data`
+    volumes, and only ever created one of the four databases the platform actually needs. Rewritten
+    to create all four databases (new `scripts/postgres/init/01-create-databases.sh`) and run all
+    four services as containers. Two more services'-own `docker-compose.yml`/`.dev.yml` files had
+    the *same* connection-string key name bug as #1's config-loading fix exposed
+    (`ConnectionStrings__DefaultConnection`, which neither service's `Program.cs` ever reads —
+    the real key is `Database:ConnectionString`) and one had a wrong Docker build context; all
+    fixed. `pos-service`'s standalone compose file referenced a `rabbitmq` host with no `rabbitmq`
+    service defined at all; added one. `inventory-service`'s `Dockerfile` had
+    `ENV ASPNETCORE_URLS=http+:8080` (missing `//`) — fixed.
+
+**Also fixed, lower severity:** CORS `AllowedOrigins` on `pos-service` and `auth-service` pointed at
+Angular/Vite dev ports (4200/5173) left over from a different template project, not this repo's
+actual Next.js apps; `notification-service` had no CORS policy configured at all despite needing
+one for the planned in-app notification bell. All four now allow `localhost:3000`/`:3001`.
+`.gitignore`'s `.env.*` pattern was silently excluding `.env.example` from every commit (both
+frontend apps' example files, referenced by their own READMEs, had never actually been committed);
+added a negation and recreated both files. `frontend/inventory` and `frontend/pos`'s READMEs had
+their example `NEXT_PUBLIC_*_API_URL` ports swapped relative to every other doc in the repo. Added
+`launchSettings.json` for `InventoryService.API`/`PosService.API` (previously only
+`auth-service`/`notification-service` had one, at ports 5002/5001 matching the rest of the repo's
+existing documentation). Hand-authored EF migrations for `pos-service` (`InitialCreate`,
+`AddDailySalesReport`) and `inventory-service` (`AddIntegrationEventInbox`) were regenerated with
+real `dotnet ef` tooling, producing proper matching `Designer.cs`/`ModelSnapshot.cs` pairs for the
+first time.
+
+**Verification performed (all real, all this session):**
+```
+dotnet build EnterprisePOS.sln                       0 errors, 0 warnings
+dotnet build (auth-service, notification-service)     0 errors, 0 warnings each
+dotnet test EnterprisePOS.sln                         48+18 unit, 7+1 integration — all pass, twice in a row
+dotnet ef database update  (all 4 services)           applied cleanly against a live Postgres
+docker compose build (all 4 API images)               all succeed
+docker compose up -d                                  all 4 containers healthy, GET /health = 200 on all 4
+curl-based smoke test                                 create + list a real product through inventory-api container;
+                                                       open-cash-session correctly rejected with a structured
+                                                       ProblemDetails error (no seeded store/register — expected,
+                                                       tracked in docs/API-GAPS.md)
+```
+
+**Not touched this session:** the API Gateway (confirmed not to exist anywhere in the repo — the
+prior assumption that a YARP gateway had been added was incorrect), auth/notification frontend
+integration, the license/subscription/trial engine. See `AI-HANDOVER.md` §L for the prioritized
+next-steps list.

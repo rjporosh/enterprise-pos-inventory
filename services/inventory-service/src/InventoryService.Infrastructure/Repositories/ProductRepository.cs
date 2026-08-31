@@ -61,7 +61,16 @@ public class ProductRepository(InventoryDbContext context) : IProductRepository
 
     public async Task<IReadOnlyList<Product>> GetPagedAsync(int pageNumber, int pageSize, Guid? categoryId, Guid? brandId, bool? isActive, string? searchTerm, string sortBy, bool sortDescending, CancellationToken ct = default)
     {
-        var query = context.Products.IgnoreQueryFilters().AsQueryable();
+        // Include is required: GetAllProductsHandler's DTO mapping dereferences
+        // p.Category.Name / p.Brand.Name / p.Unit.Symbol directly, which throws
+        // NullReferenceException for every row once lazy-loading proxies aren't
+        // enabled (they aren't here) unless these navigations are eager-loaded.
+        var query = context.Products
+            .IgnoreQueryFilters()
+            .Include(p => p.Category)
+            .Include(p => p.Brand)
+            .Include(p => p.Unit)
+            .AsQueryable();
 
         if (categoryId.HasValue)
             query = query.Where(p => p.CategoryId == categoryId.Value);

@@ -11,7 +11,7 @@ public class DatabaseMigrationTests : IntegrationTestBase
         var migrationPath = Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory,
             "..", "..", "..", "..", "..",
-            "services/inventory-service/src/InventoryService.Infrastructure/Migrations");
+            "src/InventoryService.Infrastructure/Migrations");
         
         var migrations = Directory.GetFiles(migrationPath, "*.cs");
         migrations.Should().NotBeEmpty();

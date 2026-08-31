@@ -26,8 +26,8 @@ cp .env.example .env.local
 
 | Variable | Required | Description |
 |---|---|---|
-| `NEXT_PUBLIC_POS_API_URL` | Yes | Base URL of `pos-service` (e.g. `http://localhost:5002`). |
-| `NEXT_PUBLIC_INVENTORY_API_URL` | Yes | Base URL of `inventory-service`, used read-only for product search at checkout. |
+| `NEXT_PUBLIC_POS_API_URL` | Yes | Base URL of `pos-service` (e.g. `http://localhost:5001`). |
+| `NEXT_PUBLIC_INVENTORY_API_URL` | Yes | Base URL of `inventory-service`, used read-only for product search at checkout (e.g. `http://localhost:5002`). |
 
 ## Development / build / test
 
