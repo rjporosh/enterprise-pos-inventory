@@ -15,10 +15,14 @@ export default function SetupPage() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const { config, openSession, openStatus, openError, closeStatus, closeError } = useAppSelector((s) => s.session);
+  const user = useAppSelector((s) => s.auth.user);
+  // The cashier is now the signed-in user — no more pasting a cashier GUID (see AI-HANDOVER.md,
+  // auth-service integration). Store/register still need manual GUIDs: no Store/Register CRUD
+  // exists yet (docs/API-GAPS.md), and that's a real backend gap, not something this page can fix.
+  const cashierId = user?.id ?? "";
 
   const [storeId, setStoreId] = useState("");
   const [registerId, setRegisterId] = useState("");
-  const [cashierId, setCashierId] = useState("");
   const [receiptPaperWidthMm, setReceiptPaperWidthMm] = useState<ReceiptPaperWidth>(80);
   const [openingBalance, setOpeningBalance] = useState("0");
   const [closingBalance, setClosingBalance] = useState("0");
@@ -28,7 +32,6 @@ export default function SetupPage() {
     if (config) {
       setStoreId(config.storeId);
       setRegisterId(config.registerId);
-      setCashierId(config.cashierId);
       setReceiptPaperWidthMm(config.receiptPaperWidthMm);
     }
   }, [config]);
@@ -64,14 +67,14 @@ export default function SetupPage() {
 
   return (
     <>
-      <PageHeader title="Terminal setup" subtitle="Demo / development access — the backend does not yet provide authentication." />
+      <PageHeader title="Terminal setup" subtitle="Configure this terminal's store, register and receipt printer." />
 
       <div
         className="demo-banner"
         role="note"
       >
-        DEMO / DEVELOPMENT ACCESS — AUTHENTICATION NOT YET PROVIDED BY BACKEND. Store, register and
-        cashier are entered manually below and are not verified against a login. See docs/API-GAPS.md.
+        STORE/REGISTER MANAGEMENT NOT YET AVAILABLE — paste an existing store/register GUID below.
+        The cashier is now your signed-in account ({user?.email ?? "…"}) — no GUID needed. See docs/API-GAPS.md.
       </div>
 
       <Card style={{ marginBottom: 16 }}>
@@ -84,8 +87,8 @@ export default function SetupPage() {
             <Field label="Register ID" htmlFor="registerId" required hint="Register management isn't available yet — paste an existing register GUID.">
               <Input id="registerId" value={registerId} onChange={(e) => setRegisterId(e.target.value)} required />
             </Field>
-            <Field label="Cashier ID" htmlFor="cashierId" required hint="No login yet — paste the cashier's user GUID.">
-              <Input id="cashierId" value={cashierId} onChange={(e) => setCashierId(e.target.value)} required />
+            <Field label="Cashier" htmlFor="cashierId" hint="Derived from your signed-in account.">
+              <Input id="cashierId" value={user?.email ?? ""} disabled />
             </Field>
             <Field label="Receipt printer paper width" htmlFor="receiptPaperWidthMm" hint="Thermal printer width — controls the receipt print layout.">
               <Select

@@ -479,3 +479,28 @@ definition-of-done loop for both apps: `typecheck`, `lint`, `test` (15/15 Invent
 The only fix path bumps Next.js from 15 to 16.3.3, a major-version upgrade across both apps —
 correctly left for its own dedicated pass with full re-verification rather than a drive-by
 `npm audit fix --force` mid-session. Tracked in `AI-HANDOVER.md` §M, not silently dropped.
+
+## 2026-08-31 session (continued) — auth-service wired into both frontend apps
+
+`auth-service` is now integrated into both `frontend/inventory` and `frontend/pos`: typed API
+client, Redux auth slice + saga (login, logout, session hydration, automatic refresh-and-retry on
+401), a `/login` page in each app, and an `AppShell` route guard. POS's Setup page no longer has a
+manual "Cashier ID" GUID field — the cashier is now the signed-in user.
+
+**Verified real, browser-driven** (not just curl or unit tests): registered a real user through
+the live gateway, then drove both apps' actual `npm run dev` servers with a headless browser —
+real login, real name/email shown post-login, real logout, and a route-guard redirect confirmed by
+visiting a protected page while logged out. 0 console errors, 0 real failed requests throughout.
+
+**Found and fixed along the way:** a previously-latent test-infrastructure bug — Node.js 22+'s
+experimental built-in `localStorage` global shadows jsdom's own with a non-functional stub, which
+crashed every test touching `localStorage` (the new auth slice tests, 9 per app, were the first to
+do so). Fixed for both apps via `cross-env NODE_OPTIONS=--no-experimental-webstorage` on the `test`
+script plus an explicit jsdom URL in `vitest.config.ts`.
+
+**Full definition-of-done, both apps, all green:** `frontend/inventory` typecheck/lint/test
+(24/24)/build (12/12 routes); `frontend/pos` typecheck/lint/test (18/18)/build (8/8 routes).
+
+**Not done:** no register/forgot-password UI (login-only this pass), no RBAC-aware UI, no tenant
+isolation anywhere yet (the necessary prerequisite for the licensing/subscription engine requested
+in this project's brief). See `AI-HANDOVER.md` §N for the full breakdown and exact next steps.

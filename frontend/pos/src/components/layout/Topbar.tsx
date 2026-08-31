@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAppSelector } from "@/lib/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import { Badge } from "@/components/ui";
+import { logoutRequested } from "@/features/auth/slice";
 
 const links = [
   { href: "/", label: "Terminal" },
@@ -13,7 +14,9 @@ const links = [
 
 export function Topbar() {
   const pathname = usePathname();
+  const dispatch = useAppDispatch();
   const openSession = useAppSelector((s) => s.session.openSession);
+  const user = useAppSelector((s) => s.auth.user);
 
   return (
     <header
@@ -48,12 +51,27 @@ export function Topbar() {
           ))}
         </nav>
       </div>
-      <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         {openSession ? (
           <Badge tone="success">Session open · {openSession.openingBalance.toFixed(2)} opening</Badge>
         ) : (
           <Badge tone="warning">No cash session open</Badge>
         )}
+        {user ? (
+          <div className="topbar-user">
+            <span className="topbar-user-email">
+              {user.firstName ? `${user.firstName} ${user.lastName ?? ""}`.trim() : user.email}
+            </span>
+            <button
+              type="button"
+              className="topbar-logout"
+              onClick={() => dispatch(logoutRequested())}
+              title="Sign out"
+            >
+              ↪
+            </button>
+          </div>
+        ) : null}
       </div>
     </header>
   );

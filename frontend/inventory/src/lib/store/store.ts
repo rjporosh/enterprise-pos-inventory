@@ -4,10 +4,12 @@ import { all, fork } from "redux-saga/effects";
 
 import { productsReducer, productsSaga } from "@/features/products/slice";
 import { stockReducer, stockSaga } from "@/features/stock/slice";
+import { authReducer, authSaga, sessionExpired } from "@/features/auth/slice";
 import { toastReducer } from "@/components/ui/toastSlice";
+import { registerSessionExpiredHandler } from "@/lib/api/client";
 
 function* rootSaga() {
-  yield all([fork(productsSaga), fork(stockSaga)]);
+  yield all([fork(productsSaga), fork(stockSaga), fork(authSaga)]);
 }
 
 export function makeStore() {
@@ -17,6 +19,7 @@ export function makeStore() {
     reducer: {
       products: productsReducer,
       stock: stockReducer,
+      auth: authReducer,
       toast: toastReducer,
     },
     middleware: (getDefaultMiddleware) =>
@@ -24,6 +27,11 @@ export function makeStore() {
   });
 
   sagaMiddleware.run(rootSaga);
+
+  // The API client has no store/router reference of its own — a hard-expired session (refresh
+  // token also rejected) is reported back here so the UI can react (route guard in AppShell
+  // redirects to /login once auth.status flips to "unauthenticated").
+  registerSessionExpiredHandler(() => store.dispatch(sessionExpired()));
 
   return store;
 }

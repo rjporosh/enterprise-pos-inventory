@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logoutRequested } from "@/features/auth/slice";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 
 const links = [
   { href: "/", label: "Dashboard", icon: "◆" },
@@ -11,6 +13,9 @@ const links = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((s) => s.auth.user);
+
   return (
     <nav className="sidebar" aria-label="Main navigation">
       <div className="sidebar-brand">
@@ -26,6 +31,25 @@ export function Sidebar() {
           </Link>
         );
       })}
+
+      {user ? (
+        <div className="sidebar-user">
+          <div className="sidebar-user-info">
+            <span className="sidebar-user-name">
+              {user.firstName ? `${user.firstName} ${user.lastName ?? ""}`.trim() : user.email}
+            </span>
+            {user.firstName ? <span className="sidebar-user-email">{user.email}</span> : null}
+          </div>
+          <button
+            type="button"
+            className="sidebar-logout"
+            onClick={() => dispatch(logoutRequested())}
+            title="Sign out"
+          >
+            ↪
+          </button>
+        </div>
+      ) : null}
     </nav>
   );
 }

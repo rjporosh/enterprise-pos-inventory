@@ -58,8 +58,10 @@
       services run in Docker, pass health checks, a real product create+list round-trip was
       smoke-tested through a live container); frontend apps have not yet been pointed at a running
       backend in this environment — still the next concrete step
-- [ ] Production authentication/authorization — `auth-service` exists and now builds/runs/migrates
-      cleanly (2026-08-31), but is not integrated into either frontend app
+- [~] Production authentication/authorization — `auth-service` builds/runs/migrates cleanly and is
+      now integrated into both frontend apps (real login/logout/route-guards, verified
+      browser-driven end-to-end, 2026-08-31); authorization (RBAC-aware UI, server-side permission
+      policies beyond "authenticated or not") and tenant isolation are still not started
 - [ ] Production tenant isolation
 - [~] Gateway/BFF — did not exist anywhere in the repo at the start of 2026-08-31 (an earlier
       assumption that one had been added was incorrect); built same day (`services/gateway`,
@@ -131,19 +133,27 @@ Create a clean baseline before adding large commercial features.
 ---
 
 # Phase 2 — Authentication, Authorization & Multi-Tenancy
-**Status: NOT STARTED / HIGH PRIORITY**
+**Status: IDENTITY/FRONTEND INTEGRATION DONE 2026-08-31 — authorization/tenant isolation NOT STARTED**
 
 ## Goal
 Make the system safe for multiple real businesses.
 
 ### Identity
-- [ ] Authentication service/identity boundary
-- [ ] Access token/session strategy
-- [ ] Refresh-token/session revocation
-- [ ] Password/security policy
-- [ ] Account lockout/rate limits
-- [ ] Secure logout
-- [ ] Security audit events
+- [x] Authentication service/identity boundary — `auth-service` (existed already; integrated into
+      both frontend apps 2026-08-31)
+- [x] Access token/session strategy — JWT access + refresh token pair, persisted client-side in
+      localStorage (`lib/auth/tokenStorage.ts` in each app), `Authorization: Bearer` attached to
+      every request
+- [x] Refresh-token/session revocation — 401 triggers an automatic refresh-and-retry in
+      `lib/api/client.ts`; `POST /api/v1/auth/logout` revokes the refresh token server-side
+      (best-effort — the client clears its own session regardless of whether that call succeeds)
+- [ ] Password/security policy — not reviewed this pass (auth-service's own validation rules were
+      not audited as part of frontend integration)
+- [ ] Account lockout/rate limits — `auth-service` already has a stricter rate limiter on
+      login/register (`RequireRateLimiting("auth-write")`); account lockout itself not verified
+- [x] Secure logout — clears local tokens and calls the server revoke endpoint
+- [ ] Security audit events — `auth-service` has an audit log table; not surfaced in either
+      frontend app (e.g. no "recent sign-ins" UI) — deferred, not required for MVP auth
 
 ### Authorization
 - [ ] RBAC

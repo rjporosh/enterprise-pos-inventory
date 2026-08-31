@@ -744,3 +744,86 @@ Per `docs/ROADMAP-v3.0.md`'s Delivery Order, next is auth integration:
    route guards, derive `cashierId`/`userId` from the token instead of a pasted GUID).
 2. Then tenant isolation + the licensing/subscription/trial engine described in this
    conversation's opening prompt — see §L's "Exact next command" for the fuller breakdown.
+
+---
+
+## N. Auth integration for both frontend apps — 2026-08-31 (same session as §L/§M)
+
+Item 1 above is now done. `auth-service` is wired into both `frontend/inventory` and
+`frontend/pos`: a typed `lib/api/auth.ts` client, a `features/auth/slice.ts` Redux slice (login,
+register-ready-but-no-UI-yet, logout, session hydration from localStorage, automatic
+refresh-and-retry on 401 in `lib/api/client.ts`), a `/login` page in each app matching the existing
+design system, and an `AppShell` route guard that redirects an unauthenticated visitor to `/login`
+and back once signed in. POS's Setup page no longer has a manual "Cashier ID" text field — the
+cashier is now the signed-in user's ID (`useAppSelector(s => s.auth.user?.id)`); Store/Register
+remain manual GUIDs, which is a separate, still-open, correctly-documented backend gap
+(`docs/API-GAPS.md` — no Store/Register CRUD exists).
+
+### Verified real, browser-driven — not just curl or unit tests
+
+Using the `browser-automation` skill against real running `npm run dev` servers for both apps,
+pointed at the live Docker gateway/backend stack:
+- Registered a real user via `POST :5010/api/v1/auth/register` (`demo@enterprise-pos.test` /
+  `P@ssw0rd123!` — this account now exists in the dev `auth_service` database; harmless to leave,
+  useful for future manual testing).
+- **Inventory**: filled and submitted the real login form → redirected to `/` → sidebar shows the
+  real fetched name ("Dana Owner") and email → clicked logout → toast shown, redirected to
+  `/login` → visited `/products` directly while logged out → route guard redirected back to
+  `/login` (confirms the guard works, not just the happy path).
+- **POS**: same login flow → topbar shows the user and a logout button → Setup page's Cashier
+  field shows the signed-in account's email, read-only, no GUID input anywhere on the page.
+- 0 console errors, 0 real failed requests in every run (the `net::ERR_ABORTED` entries in each
+  script's output are Next.js JS-chunk/HMR requests aborted by the client-side navigation that
+  follows login/logout — a normal artifact of testing through fast client-side redirects, not a
+  bug; nothing business-relevant failed).
+
+### A real, previously-latent test-infra bug found and fixed along the way
+
+Both apps' `npm test` **crashed on every test that touches `localStorage`** the first time one was
+written (the new `features/auth/__tests__/slice.test.ts`, 9 tests each app) —
+`TypeError: Cannot read properties of undefined (reading 'removeItem')`. Root cause: **Node.js
+22+'s experimental built-in `--experimental-webstorage` global `localStorage`** (on by default in
+this environment's Node 26) shadows jsdom's own `window.localStorage` with a non-functional stub
+outside a `--localstorage-file`-backed process. No test before this session ever touched
+`localStorage`, so nothing had surfaced it. Fixed for both apps: `cross-env NODE_OPTIONS=
+--no-experimental-webstorage` prefixed onto the `test` npm script (new `cross-env` devDependency,
+for Windows/Mac/Linux portability — matches this repo's stated cross-platform support), plus an
+explicit `environmentOptions.jsdom.url` in `vitest.config.ts` (a related, smaller jsdom
+opaque-origin gotcha, fixed defensively even though the Node flag alone was the actual fix).
+
+### Verified (full definition-of-done loop, both apps, after all changes)
+
+```
+frontend/inventory: typecheck, lint, test (24/24 — 15 pre-existing + 9 new auth tests), build (12/12 routes)
+frontend/pos:        typecheck, lint, test (18/18 — 9 pre-existing + 9 new auth tests), build (8/8 routes)
+```
+
+### What's genuinely still not done
+
+- **No register/forgot-password/reset-password UI** in either app — `authApi.register` exists in
+  the client but there's no `/register` page calling it yet. Login-only was the scope for this
+  pass; the demo user above was created via a direct API call, not through a UI.
+- **RBAC-aware UI** — every authenticated user sees the same UI regardless of role. `auth-service`
+  has a full permissions/modules/roles admin API; nothing in either frontend app reads or acts on
+  role/permission claims yet beyond "is signed in at all."
+- **No tenant isolation anywhere** — a signed-in user's requests aren't scoped to a tenant/business
+  in any way server-side. This is the load-bearing prerequisite for the licensing/subscription
+  engine requested in this conversation's opening prompt, and is next.
+- **`auth-service`'s own JWT issuer/audience/role defaults still carry bus-ticketing-template
+  branding** (`iss: https://identity.bus-ticketing.local`, `aud: bus-ticketing-api`, new users
+  default to role `"Customer"`) — cosmetic/internally-consistent (doesn't break token
+  validation, since issuer/audience only need to match between issuing and validating code within
+  the same service), but worth a cleanup pass before this is customer-facing. Not fixed this
+  session — out of scope for a frontend integration pass.
+
+### Exact next command
+
+Per `docs/ROADMAP-v3.0.md`'s Delivery Order: tenant isolation, then the licensing/subscription/
+trial engine (3-day trial, POS-only/Inventory-only/Combined plans, product-count-based tiers,
+1000/2000 BDT pricing) described in this conversation's opening prompt. Suggested concrete first
+step: add a `TenantId`-aware `IDbContextFactory`/query-filter pattern to `inventory-service` and
+`pos-service` (the column already exists on every entity per ADR-006 — see `shared/shared-kernel/
+src/ITenantEntity.cs` — it has just never been read or enforced), then design the
+Tenant/Subscription/Plan domain as a new bounded context (likely a new `services/billing-service`,
+matching this repo's one-service-per-solution pattern) before wiring entitlement checks into the
+gateway or per-service middleware.
