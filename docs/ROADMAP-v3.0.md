@@ -566,7 +566,14 @@ Create an independent Notification Service.
 ---
 
 # Phase 12 — SaaS Subscription, Billing & Licensing
-**Status: NOT STARTED**
+**Status: DESIGNED, NOT IMPLEMENTED** — see
+[`decisions/ADR-009-tenancy-and-licensing.md`](../decisions/ADR-009-tenancy-and-licensing.md)
+(written 2026-08-31) for a concrete, file-path-level implementation plan: Tenant lives in
+`auth-service` (created at registration, `tenant_id` JWT claim), Plan/Subscription/trial-expiry
+lives in a new `services/billing-service`, enforcement happens in `pos-service`/`inventory-service`
+themselves (not the gateway) via a `GET /api/v1/entitlements/{tenantId}` call. Read the ADR before
+starting — it also documents what's deliberately out of scope (real payment provider integration)
+and the exact order to build in (auth-service's Tenant first, everything else depends on it).
 
 ### Commercial lifecycle
 - [ ] Signup

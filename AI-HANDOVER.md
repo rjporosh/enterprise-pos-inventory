@@ -915,3 +915,104 @@ dotnet test EnterprisePOS.sln           48 (Inventory) + 19 (POS, was 18 — +1 
 Same as §N: tenant isolation, then the licensing/subscription/trial engine. Additionally now
 unblocked and worth doing opportunistically: a Store/Register picker UI in the POS frontend's
 Setup page (small, high-value, no backend work needed — the API exists now).
+
+---
+
+## P. Session summary and handoff — 2026-08-31 (end of session)
+
+This session started from a repo where the last real verification was frontend-only (no
+`dotnet`/Docker available in any prior session). This session had both, for the first time, and
+used them to take the platform from "backend never actually run" to "all five services build,
+test, migrate, run in Docker, and were exercised end-to-end through a real browser" — while
+finding and fixing **13 previously-undetected bugs**, several severe enough to have blocked any
+real deployment or usage. Full detail is in §L through §O above and in
+`release-notes/release-notes.md`; this section is the one-page summary.
+
+### What shipped this session, in order
+
+1. **Phase 1 backend baseline** (§L) — all 4 pre-existing services (`auth`, `notification`, `pos`,
+   `inventory`) build 0/0 (including 0 unresolved security advisories), all tests pass repeatably,
+   EF migrations regenerated with real tooling and applied to a live Postgres, all 4 run in Docker
+   with passing health checks. Ten bugs fixed to get here — see §L for the full list; the two most
+   severe: `inventory-service`/`pos-service` used the wrong SDK so `appsettings.json` never shipped
+   in any real build, and a MediatR pipeline behavior's DI lifetime bug broke every validated
+   endpoint the moment scope validation was on (i.e. in the exact `Development` environment Docker
+   uses).
+2. **API Gateway** (§M) — `services/gateway` (new, YARP), routing to all 4 services, verified real
+   end-to-end through the running container. Also fixed: `Serilog.Sinks.Seq` had never been wired
+   on any service despite Seq running in every compose stack since a much earlier phase.
+3. **Frontend repointed at the gateway** (§M/end) — both apps' `.env.example` now default to the
+   gateway; verified with real browser-driven `npm run dev` sessions, 0 console errors.
+4. **Auth integration** (§N) — both frontend apps now have real login/logout/session/route-guards
+   against `auth-service`. Verified real, browser-driven, full loop (register → login → protected
+   page → logout → route-guard redirect). Found and fixed a real test-infra bug along the way
+   (Node.js 22+'s experimental `localStorage` global shadowing jsdom's).
+5. **Store/Register/Cashier CRUD + a critical entity-Id bug** (§O) — the POS app was **completely
+   unusable in a fresh deployment** before this (zero stores/registers existed, no endpoint could
+   create one). Fixed, plus discovered along the way that `PosService.Domain.Common.BaseEntity`
+   never generated an `Id` — every entity in `pos-service` was being inserted with `Guid.Empty`,
+   which would have broken on the second insert of any entity type. Fixed with a one-line
+   constructor change plus new regression tests. Verified with a full real browser-driven flow:
+   login → create store/register via API → Setup page → cashier auto-resolved → open cash session
+   → confirmed in Postgres with real, correctly-linked IDs throughout.
+6. **`GUIDE.md`** — a start-from-zero usage walkthrough, every command in it actually run and
+   verified this session, with an honest "Known limitations" section rather than glossing over
+   gaps.
+7. **`decisions/ADR-009-tenancy-and-licensing.md`** — a concrete, file-path-level design for the
+   tenant isolation + subscription/licensing/trial engine this project's brief asks for (3-day
+   trial, POS-only/Inventory-only/Combined plans, product-count-based tiers). **Design only, not
+   implemented** — see below.
+
+### What did NOT get built this session (in priority order for whoever continues)
+
+1. **Tenant isolation + the licensing/subscription/trial engine.** Fully designed in ADR-009 with
+   exact file paths, entity shapes, and build order — implementing it should not require
+   re-deriving the design. This is the single most consequential remaining gap relative to this
+   project's stated commercial goal (a licensed SaaS product) — every account today has permanent,
+   unlimited access to everything.
+2. **RBAC-aware UI.** `auth-service` has a full roles/permissions/modules admin API; neither
+   frontend app reads or acts on role claims beyond "signed in or not."
+3. **A "awesome," visually distinctive UI pass** on the core Inventory/POS screens (dashboard,
+   product list, POS terminal). The login pages built this session are genuinely polished and
+   match the existing design system; the pre-existing core screens (dashboard cards, product
+   table, POS cart/checkout) were not redesigned this session — they were functional before this
+   session and remain so, just not restyled. This is an open-ended, iterative design task better
+   done with direct user feedback on specific screens than guessed at in one pass — flagging it
+   honestly rather than claiming a redesign that didn't happen.
+4. **Store/Register/Category/Brand/Unit picker UI** in the frontend (the backend APIs for
+   Store/Register now exist as of this session; Category/Brand/Unit still have no CRUD API at all,
+   only fixed seed data — see `docs/API-GAPS.md`).
+5. **Frontend dependency vulnerabilities** (esbuild/postcss/sharp, 8 advisories) — fix requires a
+   Next.js 15→16 major-version upgrade across both apps, correctly left for its own dedicated pass.
+6. Register/forgot-password/reset-password frontend pages (backend endpoints exist, unused).
+7. Notification-service integration into either frontend app (no bell/panel UI), and no real event
+   wiring from inventory/pos into notification-service (e.g. low-stock alerts) — `notification-
+   service`'s RabbitMQ bindings still reference bus-ticketing-template event names that nothing
+   publishes to.
+
+### Exact next command for whoever continues
+
+```bash
+cd enterprise-pos-inventory
+
+# 1. Confirm nothing regressed since this session (should all still be true):
+dotnet build EnterprisePOS.sln && dotnet test EnterprisePOS.sln
+cd services/auth-service && dotnet build AuthService.sln && cd ../..
+cd services/notification-service && dotnet build NotificationService.sln && cd ../..
+cd services/gateway && dotnet build Gateway.sln && dotnet test Gateway.sln && cd ../..
+docker compose up -d && sleep 15 && curl http://localhost:5010/health/services
+
+# 2. Read the design before writing any code:
+#    decisions/ADR-009-tenancy-and-licensing.md
+#    Then implement in the order the ADR specifies: auth-service's Tenant entity + JWT claim
+#    first (everything else depends on the claim existing), then services/billing-service,
+#    then enforcement in pos-service/inventory-service, then frontend trial banner/upgrade page.
+
+# 3. After each milestone: rebuild the affected Docker image(s) before testing through Docker
+#    (docker compose build <service> && docker compose up -d <service>) — this session hit that
+#    exact mistake twice (§O) and it produces a confusing 404 that looks like a routing bug.
+```
+
+Do not re-verify Phases described in §L–§O from scratch — they are done and documented with real
+evidence. Do re-run the commands above once to confirm nothing regressed between sessions before
+starting new work.

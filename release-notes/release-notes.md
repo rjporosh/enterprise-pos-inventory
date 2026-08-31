@@ -533,3 +533,31 @@ all passing, 0 build warnings.
 See `AI-HANDOVER.md` §O for the full writeup, including two Docker-image-not-rebuilt process
 mistakes made and self-caught along the way (worth reading if you hit a mysterious 404 after a
 code change that definitely compiled).
+
+## 2026-08-31 session (continued) — GUIDE.md, and a full design for tenancy/licensing
+
+Added `GUIDE.md` at the repo root: a start-from-zero usage walkthrough (run the stack, register an
+account, add a product, set up a POS terminal, complete a sale). Every command in it was actually
+run and verified against the live stack this session — including an honest "Known limitations"
+section (no sign-up UI, no picker UI for reference data, no subscription/tenancy/RBAC yet) rather
+than glossing over gaps.
+
+Added `decisions/ADR-009-tenancy-and-licensing.md`: a concrete, file-path-level design for the
+tenant isolation + subscription/licensing/trial engine this project's brief calls for (3-day
+trial, POS-only/Inventory-only/Combined plans, product-count-based tiers, configurable pricing).
+**Design only — not implemented.** Covers where Tenant lives (`auth-service`, created at
+registration, a new `tenant_id` JWT claim), where Plan/Subscription/trial-expiry lives (a new
+`services/billing-service`), how enforcement happens (in `pos-service`/`inventory-service`
+themselves, not the gateway, via a synchronous entitlements check), and what's explicitly out of
+scope (a real payment provider integration).
+
+### Session totals
+
+Five commits, each a real, independently-verified milestone: Phase 1 backend baseline (10 bugs
+fixed), API Gateway, frontend-repointed-at-gateway, auth integration (both apps), and Store/
+Register/Cashier CRUD (2 more bugs fixed, including one that broke every entity in `pos-service`).
+**13 previously-undetected bugs found and fixed in total this session**, several severe enough to
+have blocked any real deployment or usage — see `AI-HANDOVER.md` §L–§P for the complete list and
+evidence. All five backend services build 0 errors/0 warnings, all tests pass (67+ unit, 8
+integration), all run in Docker with passing health checks, and the full login → catalog → POS
+checkout path was verified end-to-end through a real browser against the live stack.
