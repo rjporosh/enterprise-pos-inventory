@@ -17,5 +17,15 @@ public abstract class BaseEntity<TId> : Entity<TId>, IAuditableEntity, ISoftDele
 
 public abstract class BaseEntity : BaseEntity<Guid>, IAggregateRoot
 {
-    protected BaseEntity() : base() { }
+    // Without this, every PosService entity (Store, CashRegister, Sale, CashSession, Cashier,
+    // Customer, Payment, ...) gets inserted with Id = Guid.Empty: Entity<TId>'s parameterless
+    // constructor never assigns Id, and unlike InventoryService.Domain.Common.BaseEntity (and
+    // SharedKernel.BaseEntity), this constructor never generated one either. A second insert of
+    // any entity type then fails on the primary key uniqueness constraint. Found 2026-08-31 while
+    // adding Store/Register CRUD — the very first successful "create" surfaced Guid.Empty in the
+    // response and in the database row.
+    protected BaseEntity() : base()
+    {
+        Id = Guid.NewGuid();
+    }
 }

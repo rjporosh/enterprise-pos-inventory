@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
-import { configSaved, ReceiptPaperWidth } from "@/features/session/slice";
+import { cashierEnsureRequested, configSaved, ReceiptPaperWidth } from "@/features/session/slice";
 import {
   cashSessionCloseRequested,
   cashSessionCloseReset,
@@ -14,12 +14,17 @@ import {
 export default function SetupPage() {
   const dispatch = useAppDispatch();
   const router = useRouter();
-  const { config, openSession, openStatus, openError, closeStatus, closeError } = useAppSelector((s) => s.session);
+  const { config, openSession, openStatus, openError, closeStatus, closeError, cashierEnsureStatus, cashierEnsureError } =
+    useAppSelector((s) => s.session);
   const user = useAppSelector((s) => s.auth.user);
-  // The cashier is now the signed-in user — no more pasting a cashier GUID (see AI-HANDOVER.md,
-  // auth-service integration). Store/register still need manual GUIDs: no Store/Register CRUD
-  // exists yet (docs/API-GAPS.md), and that's a real backend gap, not something this page can fix.
-  const cashierId = user?.id ?? "";
+  // The cashier is now resolved server-side from the signed-in account — no more pasting a
+  // cashier GUID (see AI-HANDOVER.md, auth-service integration). pos-service has its own Cashier
+  // entity distinct from the auth-service user (ADR-001, separate databases), so "save terminal
+  // identity" below calls POST /api/v1/cashiers/ensure to get-or-create it, then stores the
+  // resulting pos-service CashierId in config.cashierId. Store/register still need manual GUIDs:
+  // no Store/Register CRUD existed until 2026-08-31 either, but no UI for it here yet — paste an
+  // existing GUID (see docs/API-GAPS.md for status).
+  const cashierId = config?.cashierId ?? "";
 
   const [storeId, setStoreId] = useState("");
   const [registerId, setRegisterId] = useState("");
@@ -44,7 +49,16 @@ export default function SetupPage() {
 
   function saveConfig(e: React.FormEvent) {
     e.preventDefault();
+    if (!user) return;
     dispatch(configSaved({ storeId, registerId, cashierId, receiptPaperWidthMm }));
+    dispatch(
+      cashierEnsureRequested({
+        storeId,
+        username: user.email,
+        fullName: user.firstName ? `${user.firstName} ${user.lastName ?? ""}`.trim() : user.email,
+        email: user.email,
+      })
+    );
   }
 
   function openSessionHandler(e: React.FormEvent) {
@@ -73,21 +87,38 @@ export default function SetupPage() {
         className="demo-banner"
         role="note"
       >
-        STORE/REGISTER MANAGEMENT NOT YET AVAILABLE — paste an existing store/register GUID below.
-        The cashier is now your signed-in account ({user?.email ?? "…"}) — no GUID needed. See docs/API-GAPS.md.
+        STORE/REGISTER SELF-SERVICE MANAGEMENT NOT YET AVAILABLE — paste an existing store/register
+        GUID below (or create one via <code>POST /api/v1/stores</code> / <code>/api/v1/registers</code>).
+        The cashier is resolved automatically from your signed-in account ({user?.email ?? "…"}) — no
+        GUID needed. See docs/API-GAPS.md.
       </div>
 
       <Card style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0, fontSize: 15 }}>1. Terminal identity</h2>
+        {cashierEnsureStatus === "failed" && cashierEnsureError && (
+          <div role="alert" style={{ background: "var(--color-danger-soft)", color: "var(--color-danger)", padding: "10px 14px", borderRadius: 6, marginBottom: 16, fontSize: 13.5 }}>
+            Could not resolve your cashier record: {cashierEnsureError}
+          </div>
+        )}
         <form onSubmit={saveConfig}>
           <div className="form-grid">
-            <Field label="Store ID" htmlFor="storeId" required hint="Store management isn't available yet — paste an existing store GUID.">
+            <Field label="Store ID" htmlFor="storeId" required hint="Paste an existing store GUID, or create one via the API — no store-picker UI yet.">
               <Input id="storeId" value={storeId} onChange={(e) => setStoreId(e.target.value)} required />
             </Field>
-            <Field label="Register ID" htmlFor="registerId" required hint="Register management isn't available yet — paste an existing register GUID.">
+            <Field label="Register ID" htmlFor="registerId" required hint="Paste an existing register GUID, or create one via the API — no register-picker UI yet.">
               <Input id="registerId" value={registerId} onChange={(e) => setRegisterId(e.target.value)} required />
             </Field>
-            <Field label="Cashier" htmlFor="cashierId" hint="Derived from your signed-in account.">
+            <Field
+              label="Cashier"
+              htmlFor="cashierId"
+              hint={
+                cashierEnsureStatus === "ensuring"
+                  ? "Resolving your cashier record…"
+                  : cashierId
+                    ? "Resolved from your signed-in account."
+                    : "Resolved automatically when you save."
+              }
+            >
               <Input id="cashierId" value={user?.email ?? ""} disabled />
             </Field>
             <Field label="Receipt printer paper width" htmlFor="receiptPaperWidthMm" hint="Thermal printer width — controls the receipt print layout.">
@@ -107,7 +138,7 @@ export default function SetupPage() {
         </form>
       </Card>
 
-      {config && !openSession && (
+      {config && !openSession && cashierId && (
         <Card style={{ marginBottom: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 15 }}>2. Open cash session</h2>
           {openStatus === "failed" && (

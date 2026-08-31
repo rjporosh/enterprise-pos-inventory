@@ -342,6 +342,8 @@ A cashier can complete a full business day using scanner-first checkout without 
 
 ### Register
 - [x] Register foundation
+- [x] Register/Store CRUD API — done 2026-08-31 (`POST/GET /api/v1/stores`,
+      `/api/v1/registers`); no frontend picker UI yet, paste a GUID or call the API directly
 - [x] Cash session foundation
 - [ ] Opening cash
 - [ ] Cash in

@@ -73,7 +73,8 @@ None of these are implemented by the frontend. Each is a documented, intentional
 |---|---|---|---|---|
 | **Category / Brand / Unit CRUD** | `Product` requires `categoryId`, `brandId`, `unitId` as GUIDs, but there's no endpoint to list/create them. The Products form currently accepts these as raw GUID text input with an inline warning. This is the single biggest usability blocker for a non-technical shop owner. | `GET/POST /api/v1/categories`, same for `brands`, `units` — simple id+name(+symbol for unit) CRUD, list unpaginated (these are reference data, expected to be small). | None — additive. | **High** |
 | **Warehouse CRUD** | `Stock` requires `warehouseId`. Same problem as above for every stock operation (in/out/adjustment/transfer) and for `Sale`'s implicit register→store→warehouse chain. | `GET/POST /api/v1/warehouses`. | None — additive. | **High** |
-| **Store / Register CRUD** | POS `CreateSaleRequest` requires `storeId` and `registerId`; `OpenSessionRequest` requires `registerId`. No endpoint exists to list or create these, so the POS "terminal setup" screen asks the operator to paste GUIDs directly, explicitly labeled as a stand-in. | `GET/POST /api/v1/stores`, `GET/POST /api/v1/registers`. | None — additive. | **High** |
+| **Store / Register CRUD — CLOSED 2026-08-31** | Was a hard blocker, not just friction: zero stores/registers existed anywhere and no endpoint could create one, so a fresh deployment's POS app was completely unusable (confirmed: `REGISTER_NOT_FOUND` on every open-session attempt, and manually inserting rows was the only workaround). `POST/GET /api/v1/stores` and `POST/GET /api/v1/registers` now exist (Domain/Repository layers already existed — only the Application/API layers were missing). The frontend's Setup page still has no picker UI (paste a GUID, or create one via the API directly) — that UI is the next, lower-priority step. | — | None — additive; verified real end-to-end (create store → create register → open cash session → complete two sales) via the running Docker stack + a real browser session. | Done (API); UI picker still open |
+| **POS `cashierId` ≠ auth-service `User.Id` — found and closed 2026-08-31** | Wiring auth into the POS frontend initially set `cashierId = <authenticated user's auth-service User.Id>`, but pos-service's `Cashier` is its own entity in its own database (ADR-001) with no relationship to auth-service's identity at all — every sale/session call failed with `CASHIER_NOT_FOUND`. Fixed with a bridging endpoint, `POST /api/v1/cashiers/ensure` (get-or-create by `Username` = the user's email, idempotent), called once from the Setup page after a store is chosen; the frontend now stores the resulting pos-service `CashierId`, not the auth `User.Id`. | — | None — additive. | Done |
 | **Authentication / current user — CLOSED 2026-08-31** | `services/auth-service` is now integrated into both frontend apps: `lib/api/auth.ts` (login/register/refresh/logout/me), a `features/auth/slice.ts` Redux slice with a saga, a `/login` page in each app, an `AppShell` route guard, and a 401-triggers-refresh-then-retry interceptor in each app's `lib/api/client.ts`. POS's `cashierId` is now derived from the signed-in user (`user.id`) — the manual "Cashier ID" GUID field is gone from the Setup page (Store/Register GUIDs remain manual — see the CRUD row below, unrelated and still open). Verified real, browser-driven end-to-end for both apps: register → login → protected page renders with the real user's name → logout → route guard redirects an unauthenticated visit to `/products` (Inventory) back to `/login`. | — | Needs `auth-service` running (Docker or `dotnet run`) at whatever URL `NEXT_PUBLIC_AUTH_API_URL` points to — the gateway (`:5010`) by default. | Done |
 | **Barcode lookup / barcode-aware search** | `Product.Barcode` exists and is stored, but `GetAllProductsQuery`'s `SearchTerm` filter only matches `Name` and `Sku` (verified in `ProductRepository`, the `Where` clause is `Name.Contains || Sku.Contains`). There is an **unused** `GetByBarcodeAsync` method on the repository with no controller route calling it. A USB barcode scanner typing into the POS search box will only find a product if the barcode text happens to also match the name/SKU. | Either wire `GetByBarcodeAsync` to `GET /api/v1/products/by-barcode/{barcode}`, or add `Barcode` to the existing `SearchTerm` `Where` clause. The latter is a one-line change and is the recommended fix. | None — the repository method already exists. | **High** — cheap fix, real UX impact. |
 | **On-demand / "today" daily sales report** | `DailySalesReportJob` is a background service that generates one `DailySalesReport` row per store per UTC calendar day, at UTC midnight, with a 7-day catch-up window on restart. There is no "generate now" endpoint. `GET /api/v1/reports/daily-sales?reportDate=<today>` will 404 with `REPORT_NOT_FOUND` for the entire current day, every day, by design. | A `POST /api/v1/reports/daily-sales/generate?storeId=&reportDate=` (idempotent, same underlying `GenerateIfMissingAsync`) that the frontend can call on-demand for "today," or a live/unmaterialized query path that computes the same aggregate without persisting it. | `DailySalesReportGenerator.GenerateIfMissingAsync` already contains the aggregation logic and just needs an HTTP trigger. | **High** — "how did today go" is a core daily question for a shop owner and currently cannot be answered same-day. |
@@ -114,8 +115,9 @@ None of these are implemented by the frontend. Each is a documented, intentional
   change amount; all of those come from the `SaleDto` returned after `Complete`.
 - **Setup page banner on the POS app** (updated 2026-08-31, was "DEMO / DEVELOPMENT ACCESS —
   AUTHENTICATION NOT YET PROVIDED"): now states plainly that only Store/Register still need a
-  manually-pasted GUID (no CRUD exists for either yet) — the cashier identity comes from the
-  signed-in account now that `auth-service` is integrated, not from a text field.
+  manually-pasted GUID (no picker UI yet, though the CRUD API exists as of 2026-08-31) — the
+  cashier identity is resolved automatically from the signed-in account now that `auth-service` is
+  integrated (via `POST /api/v1/cashiers/ensure`, not a text field).
 
 ---
 
@@ -124,9 +126,12 @@ None of these are implemented by the frontend. Each is a documented, intentional
 1. Wire `Barcode` into the existing `SearchTerm` filter (or expose `GetByBarcodeAsync`) — smallest
    change, real POS-speed impact.
 2. Add a `POST /reports/daily-sales/generate` (or equivalent) trigger so "today" is answerable.
-3. Category / Brand / Unit / Warehouse / Store / Register minimal CRUD — removes all the manual-GUID
-   friction across both apps in one pass.
+3. ~~Category / Brand / Unit / Warehouse / Store / Register minimal CRUD~~ — **Store/Register done
+   2026-08-31** (`services/pos-service`); Category/Brand/Unit/Warehouse were already covered by
+   seed data (`SeedInitialData` migration) rather than CRUD, which remains the real gap for a
+   non-technical operator who needs to add a *new* category/brand/unit beyond the 5/5/3/2 seeded.
 4. Cash session GET (by id, and "current open for register") — removes the localStorage-as-source-
    of-truth workaround.
-5. Authentication — everything above still works without it for a pilot with 1 trusted operator per
-   terminal, but it's required before this goes to unattended multi-cashier use.
+5. ~~Authentication~~ — **done 2026-08-31**, integrated into both frontend apps (see
+   `AI-HANDOVER.md` §N). Next: RBAC-aware UI and tenant isolation (see §L/§N's "exact next
+   command").

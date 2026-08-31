@@ -16,6 +16,8 @@ public class CashRegisterTests
         register.Code.Should().Be("REG-001");
         register.StoreId.Should().Be(storeId);
         register.IsActive.Should().BeTrue();
+        // Regression: see StoreTests.CreateStore_ShouldAssignANonEmptyId.
+        register.Id.Should().NotBe(Guid.Empty);
     }
 
     [Fact]

@@ -827,3 +827,91 @@ src/ITenantEntity.cs` — it has just never been read or enforced), then design 
 Tenant/Subscription/Plan domain as a new bounded context (likely a new `services/billing-service`,
 matching this repo's one-service-per-solution pattern) before wiring entitlement checks into the
 gateway or per-service middleware.
+
+---
+
+## O. Store/Register/Cashier CRUD, and a critical PosService entity-Id bug — 2026-08-31 (same session)
+
+While preparing a "how to use this from scratch" guide, discovered that **the POS app was
+completely unusable in a fresh deployment**: zero stores/registers existed anywhere and no
+endpoint could create one (`REGISTER_NOT_FOUND` on every open-session attempt — confirmed, not
+guessed). The Domain/Repository layers for `Store` and `CashRegister` already existed in
+`pos-service`; only the Application (CQRS) and API (Controller) layers were missing. Added both:
+
+- `POST/GET /api/v1/stores`, `POST/GET /api/v1/registers` — full CQRS slices
+  (`PosService.Application/{Stores,Registers}/...`), matching the existing `CreateSale`-style
+  pattern exactly (Result<T>, FluentValidation, `Problem()`-shaped errors).
+- `POST /api/v1/cashiers/ensure` — a **new bridging concept**, not in the original plan: wiring
+  auth into the POS frontend initially set `cashierId = <auth-service User.Id>`, but pos-service's
+  `Cashier` is its own entity in its own database (ADR-001) with zero relationship to
+  auth-service's identity model — every sale/session call failed `CASHIER_NOT_FOUND` the moment a
+  real store/register existed to get past the earlier blocker. Fixed with a get-or-create endpoint
+  keyed on `Username` = the signed-in user's email (idempotent, no new migration needed — reused
+  the existing unique index on `Cashier.Username`). The Setup page now calls this once per
+  save and stores the resulting pos-service `CashierId`, not the auth `User.Id`.
+- Gateway routes added for all three (`/api/v1/stores`, `/api/v1/registers`, `/api/v1/cashiers`).
+
+### A second critical, previously-undetected bug found while verifying the above
+
+The **first** store ever created came back with `id: "00000000-0000-0000-0000-000000000000"` —
+`Guid.Empty`. Root cause: `PosService.Domain.Common.BaseEntity`'s constructor never called
+`Id = Guid.NewGuid()` (unlike `InventoryService.Domain.Common.BaseEntity`'s and
+`SharedKernel.BaseEntity`'s equivalents, both of which do). **This affected every single entity in
+pos-service** — Store, CashRegister, Cashier, Sale, SaleItem, CashSession, Customer, Payment — all
+of them extend this base class. A second insert of any entity type would have violated its primary
+key's uniqueness constraint. This bug had been flagged as a known discrepancy in a much older
+handover entry ("worth a follow-up decision, deliberately not touched") but never actually fixed,
+and — critically — **nothing had ever caught it**: `PosService.IntegrationTests` has exactly one
+test (`HealthCheckTests`, added in a much earlier phase), no test ever exercised a real Postgres
+insert-then-read-Id round trip for any POS entity until this session's manual verification of the
+new Store endpoint surfaced it directly.
+
+Fixed with a one-line constructor addition (`services/pos-service/src/PosService.Domain/Common/
+BaseEntity.cs`), plus new regression assertions in `PosService.UnitTests/Domain/{StoreTests,
+CashRegisterAndSessionTests}.cs` (`entity.Id.Should().NotBe(Guid.Empty)`, and that two instances
+get different Ids) so this can't silently regress again.
+
+### Verified real, browser-driven, full loop (not just curl)
+
+Using the `browser-automation` skill against the live Docker gateway/backend stack: logged in as
+the `demo@enterprise-pos.test` user created in §N, navigated to Setup, entered a real (freshly
+created, via `curl`) store/register GUID pair, clicked "Save terminal identity" (which triggers the
+new cashier-ensure call), then opened a cash session with a real opening balance. The topbar
+correctly flipped from "NO CASH SESSION OPEN" to "SESSION OPEN · 500.00 OPENING", and a
+"Cash session opened." toast appeared. Confirmed in Postgres directly: the `cash_sessions` row has
+a real non-empty `id`, correctly linked `cashier_id`/`register_id`, and `status = 'Open'`.
+
+**Two silly but real process mistakes along the way, both self-caught and fixed**: forgot to
+rebuild the `gateway-api` and `pos-api` Docker images after adding the new routes/controller (the
+first end-to-end attempt 404'd purely from stale container images, not a code bug) — rebuilt both,
+re-verified, confirmed working. Worth remembering for whoever continues: **after any backend code
+change, `docker compose build <service> && docker compose up -d <service>` before testing through
+Docker** — `dotnet build` succeeding does not mean the running container has the new code.
+
+### Verified (full backend suite, after all changes in §L/§M/§N/§O)
+
+```
+dotnet build EnterprisePOS.sln          0 errors, 0 warnings
+dotnet test EnterprisePOS.sln           48 (Inventory) + 19 (POS, was 18 — +1 regression test) unit,
+                                         7 (Inventory) + 1 (POS) integration — all pass
+```
+
+### What's genuinely still not done
+
+- **No frontend picker UI for Store/Register** — still a paste-a-GUID field, now backed by a real
+  API instead of nothing. Building the picker (a dropdown fed by `GET /api/v1/stores`) is a small,
+  clearly-scoped next step if continuing frontend polish.
+- **Cashier's `FullName` shows the user's email, not their real name**, in the one test run above —
+  a timing issue (the Setup page's cashier-ensure call can fire before the async `GET /api/v1/auth/me`
+  profile fetch from login finishes populating `firstName`/`lastName` in Redux state). Cosmetic
+  only — `Username` (email) is what actually identifies the cashier — not fixed this session, low
+  priority.
+- Same "Not yet done" items as §L/§M/§N: no tenant isolation, no licensing/subscription engine, no
+  RBAC-aware UI, no register/forgot-password UI, frontend dependency vulnerabilities need a Next.js
+  major-version upgrade pass.
+
+### Exact next command
+
+Same as §N: tenant isolation, then the licensing/subscription/trial engine. Additionally now
+unblocked and worth doing opportunistically: a Store/Register picker UI in the POS frontend's
+Setup page (small, high-value, no backend work needed — the API exists now).

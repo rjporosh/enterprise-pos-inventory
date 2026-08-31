@@ -504,3 +504,32 @@ script plus an explicit jsdom URL in `vitest.config.ts`.
 **Not done:** no register/forgot-password UI (login-only this pass), no RBAC-aware UI, no tenant
 isolation anywhere yet (the necessary prerequisite for the licensing/subscription engine requested
 in this project's brief). See `AI-HANDOVER.md` §N for the full breakdown and exact next steps.
+
+## 2026-08-31 session (continued) — POS was unusable from scratch; fixed, plus a critical Id bug
+
+Discovered, while preparing a product usage guide, that **the POS app was completely unusable in a
+fresh deployment**: zero stores/registers existed anywhere and no endpoint could create one.
+Added `POST/GET /api/v1/stores` and `/api/v1/registers` (the Domain/Repository layers already
+existed in `pos-service`; only Application/API were missing) plus a new bridging endpoint,
+`POST /api/v1/cashiers/ensure`, since pos-service's `Cashier` entity turned out to be completely
+separate from auth-service's `User` (own database, ADR-001) — the earlier assumption that
+`cashierId = auth User.Id` was wrong and caused every sale/session call to fail `CASHIER_NOT_FOUND`.
+
+**A second, more severe bug surfaced while verifying the first fix**: the very first store ever
+created came back with `id: Guid.Empty`. Root cause — `PosService.Domain.Common.BaseEntity`'s
+constructor never generated an Id (unlike `InventoryService`'s and `SharedKernel`'s equivalents),
+silently affecting **every entity in pos-service** (Store, CashRegister, Cashier, Sale, SaleItem,
+CashSession, Customer, Payment) — a second insert of any of them would have violated its primary
+key. This had been flagged in a much older handover as a known discrepancy and never fixed, and no
+test had ever caught it (the sole POS integration test is a health check). Fixed with a one-line
+constructor addition and new regression assertions.
+
+**Verified real, browser-driven, full loop**: logged in, entered a real store/register, saved
+(triggering the cashier-ensure call), opened a cash session with a real balance — topbar correctly
+showed "SESSION OPEN · 500.00 OPENING", confirmed in Postgres directly with real non-empty,
+correctly-linked IDs throughout. Full backend suite after all changes: 48+19 unit, 7+1 integration,
+all passing, 0 build warnings.
+
+See `AI-HANDOVER.md` §O for the full writeup, including two Docker-image-not-rebuilt process
+mistakes made and self-caught along the way (worth reading if you hit a mysterious 404 after a
+code change that definitely compiled).

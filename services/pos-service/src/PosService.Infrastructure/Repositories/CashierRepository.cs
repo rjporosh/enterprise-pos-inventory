@@ -13,6 +13,9 @@ public class CashierRepository(PosDbContext context) : ICashierRepository
     public async Task<Cashier?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await context.Cashiers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id, ct);
 
+    public async Task<Cashier?> GetByUsernameAsync(string username, CancellationToken ct = default)
+        => await context.Cashiers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Username == username, ct);
+
     public async Task<bool> ExistsActiveAsync(Guid id, CancellationToken ct = default)
         => await context.Cashiers.IgnoreQueryFilters().AnyAsync(c => c.Id == id && c.IsActive && !c.IsDeleted, ct);
 

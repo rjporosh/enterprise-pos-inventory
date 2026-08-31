@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { call, put, takeLatest } from "redux-saga/effects";
 import { ApiError, NetworkError } from "@/lib/api/client";
 import { CloseCashSessionInput, OpenCashSessionInput, cashSessionsApi } from "@/lib/api/cashSessionsAndReports";
+import { Cashier, EnsureCashierInput, cashiersApi } from "@/lib/api/cashiers";
 import { toastShown } from "@/components/ui/toastSlice";
 
 const STORAGE_KEY = "pos.session.v1";
@@ -31,6 +32,8 @@ interface SessionState {
   openError: string | null;
   closeStatus: "idle" | "closing" | "succeeded" | "failed";
   closeError: string | null;
+  cashierEnsureStatus: "idle" | "ensuring" | "failed";
+  cashierEnsureError: string | null;
 }
 
 const initialState: SessionState = {
@@ -40,6 +43,8 @@ const initialState: SessionState = {
   openError: null,
   closeStatus: "idle",
   closeError: null,
+  cashierEnsureStatus: "idle",
+  cashierEnsureError: null,
 };
 
 function loadPersisted(): Pick<SessionState, "config" | "openSession"> {
@@ -107,6 +112,22 @@ const sessionSlice = createSlice({
       state.closeStatus = "idle";
       state.closeError = null;
     },
+
+    cashierEnsureRequested(state, _action: PayloadAction<EnsureCashierInput>) {
+      state.cashierEnsureStatus = "ensuring";
+      state.cashierEnsureError = null;
+    },
+    cashierEnsureSucceeded(state, action: PayloadAction<Cashier>) {
+      state.cashierEnsureStatus = "idle";
+      if (state.config) {
+        state.config.cashierId = action.payload.id;
+        persist({ config: state.config, openSession: state.openSession });
+      }
+    },
+    cashierEnsureFailed(state, action: PayloadAction<string>) {
+      state.cashierEnsureStatus = "failed";
+      state.cashierEnsureError = action.payload;
+    },
   },
 });
 
@@ -120,6 +141,9 @@ export const {
   cashSessionCloseSucceeded,
   cashSessionCloseFailed,
   cashSessionCloseReset,
+  cashierEnsureRequested,
+  cashierEnsureSucceeded,
+  cashierEnsureFailed,
 } = sessionSlice.actions;
 
 export const sessionReducer = sessionSlice.reducer;
@@ -163,7 +187,17 @@ function* closeCashSessionWorker(action: ReturnType<typeof cashSessionCloseReque
   }
 }
 
+function* ensureCashierWorker(action: ReturnType<typeof cashierEnsureRequested>) {
+  try {
+    const cashier: Cashier = yield call(cashiersApi.ensure, action.payload);
+    yield put(cashierEnsureSucceeded(cashier));
+  } catch (err) {
+    yield put(cashierEnsureFailed(describeError(err)));
+  }
+}
+
 export function* sessionSaga() {
   yield takeLatest(cashSessionOpenRequested.type, openCashSessionWorker);
   yield takeLatest(cashSessionCloseRequested.type, closeCashSessionWorker);
+  yield takeLatest(cashierEnsureRequested.type, ensureCashierWorker);
 }
