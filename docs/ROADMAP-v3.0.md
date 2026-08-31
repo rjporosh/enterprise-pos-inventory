@@ -229,11 +229,13 @@ rationale, including exactly what was deliberately deferred and why.
 - [ ] Optional stronger native-terminal identity where applicable
 
 ### Exit criteria
-- [~] Browser knows only public gateway origin — true for any request routed through it (verified:
-      product list, auth login attempt both round-tripped correctly via `localhost:5010`); not yet
-      true in practice because neither frontend app has been repointed at the gateway yet
-- [x] Internal service URLs cannot be discovered from frontend configuration — true once the point
-      above is done; not yet done
+- [x] Browser knows only public gateway origin — both frontend apps' `.env.example` now default to
+      `NEXT_PUBLIC_*_API_URL=http://localhost:5010` (the gateway); verified with real running dev
+      servers for both apps (browser-driven, 0 console errors, 0 failed requests) against the
+      containerized gateway/backend
+- [x] Internal service URLs cannot be discovered from frontend configuration — true for anyone who
+      copies `.env.example` as documented; an existing developer's own uncommitted `.env.local`
+      pointing directly at a service port still works too (nothing broke that path)
 - [x] Gateway survives dependency failure without cascading outage — active health checks route
       around a failing destination rather than every request timing out against it (not yet
       chaos-tested against an actual killed container, but the health-check wiring is real and

@@ -459,3 +459,23 @@ service's port directly) — the natural next step, deliberately left out of thi
 No auth/tenant propagation, circuit breakers, or retry policies at the gateway (see the ADR for
 why — these correctly follow, not precede, auth/tenant work happening elsewhere). See
 `AI-HANDOVER.md` §M for the full breakdown.
+
+## 2026-08-31 session (continued) — both frontend apps repointed at the gateway
+
+Closed the gap left by the gateway milestone above. `frontend/inventory/.env.example` and
+`frontend/pos/.env.example` now default `NEXT_PUBLIC_*_API_URL` to `http://localhost:5010` (the
+gateway) instead of each service's own port — zero code changes needed since the gateway proxies
+every route these apps already call unchanged.
+
+**Verified real, browser-driven (not just curl):** ran both apps' real `npm run dev` servers
+against the live Docker gateway/backend stack and loaded pages in an actual headless browser
+(Inventory dashboard + products list, POS terminal + setup) — 0 console errors, 0 failed requests,
+real data round-tripped end-to-end through gateway → inventory-service. Then ran the full
+definition-of-done loop for both apps: `typecheck`, `lint`, `test` (15/15 Inventory, 9/9 POS),
+`build` — all green, no regressions from before this change.
+
+**Found, not fixed:** `npm install` on both apps surfaced 8 pre-existing dependency vulnerabilities
+(esbuild — moderate, via vite/vitest; postcss + sharp — high, via Next.js's own transitive deps).
+The only fix path bumps Next.js from 15 to 16.3.3, a major-version upgrade across both apps —
+correctly left for its own dedicated pass with full re-verification rather than a drive-by
+`npm audit fix --force` mid-session. Tracked in `AI-HANDOVER.md` §M, not silently dropped.

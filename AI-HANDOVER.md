@@ -713,13 +713,19 @@ since Phase J — nothing had ever shipped logs to it. Added an optional `Seq:Ur
 five services now (four existing + gateway). Rebuilt and reconfirmed all four existing services
 still build 0/0 after this change.
 
+**Update, same session:** both frontend apps have now been repointed at the gateway too —
+`frontend/inventory/.env.example` and `frontend/pos/.env.example` both default to
+`http://localhost:5010`. Verified with real running `npm run dev` servers for both apps
+(browser-automation skill: page loads, 0 console errors, 0 failed requests, real data round-tripped
+through gateway → inventory-service) plus the full typecheck/lint/test/build loop for both apps —
+all green, no regressions. `npm install` on both apps surfaced 8 pre-existing frontend dependency
+vulnerabilities (esbuild/postcss/sharp, via vite and Next.js's own transitive deps) — **not fixed
+this session**: the only available fix bumps Next.js to 16.3.3, a major-version upgrade across both
+apps that needs its own dedicated pass with full re-verification, not a drive-by fix. Tracked here,
+not silently ignored.
+
 ### What's genuinely still not done (don't re-derive from hope)
 
-- **Neither frontend app has been repointed at the gateway.** `frontend/inventory` and
-  `frontend/pos` still call their respective services' ports (`5002`, `5001`) directly. This is
-  the natural next step if continuing gateway work — should be quick (two env var changes per app)
-  but wasn't done this session to keep this milestone's scope to "build and verify the gateway
-  itself."
 - No auth/tenant context propagation at the gateway (see ADR-008 — this correctly follows, not
   precedes, actual auth/tenant work being done elsewhere first).
 - No circuit breaker, retry policy, or explicit request-size/timeout overrides configured — YARP
@@ -727,16 +733,14 @@ still build 0/0 after this change.
 - Gateway has not been chaos-tested (e.g. killing a downstream container mid-request) — the
   active-health-check wiring is real and verified *reachable*, but "does it actually route around
   a genuinely dead container without dropping in-flight requests" has not been exercised.
+- Frontend dependency vulnerabilities (esbuild/postcss/sharp — see above) — needs a dedicated
+  Next.js 15→16 upgrade pass for both apps, not attempted this session.
 
 ### Exact next command
 
-Per `docs/ROADMAP-v3.0.md`'s Delivery Order, next is auth integration. A reasonable order:
+Per `docs/ROADMAP-v3.0.md`'s Delivery Order, next is auth integration:
 
-1. Repoint both frontend apps at the gateway (`NEXT_PUBLIC_INVENTORY_API_URL=http://localhost:5010`,
-   `NEXT_PUBLIC_POS_API_URL=http://localhost:5010`) and re-run each app's full
-   typecheck/lint/test/build loop plus a manual smoke walkthrough — cheap, high-value, closes out
-   the rest of Phase 3's exit criteria.
-2. Wire `auth-service` into both frontend apps (shared JWT/refresh-token client, auth Redux slice,
-   route guards, derive `cashierId`/`userId` from the token).
-3. Then tenant isolation + the licensing/subscription/trial engine described in this
+1. Wire `auth-service` into both frontend apps (shared JWT/refresh-token client, auth Redux slice,
+   route guards, derive `cashierId`/`userId` from the token instead of a pasted GUID).
+2. Then tenant isolation + the licensing/subscription/trial engine described in this
    conversation's opening prompt — see §L's "Exact next command" for the fuller breakdown.
