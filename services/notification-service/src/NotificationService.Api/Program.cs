@@ -28,21 +28,32 @@ var builder = WebApplication.CreateBuilder(args);
 // delivered here through Serilog's own file sink, which already does daily
 // rolling/retention robustly and is the same logging library already used
 // by every other service in this solution.
-builder.Host.UseSerilog((context, services, configuration) => configuration
-    .ReadFrom.Configuration(context.Configuration)
-    .Enrich.FromLogContext()
-    .Enrich.WithProperty("Service", "notification-service")
-    .Enrich.WithEnvironmentName()
-    .WriteTo.Console(outputTemplate:
-        "[{Timestamp:HH:mm:ss} {Level:u3}] ({CorrelationId}) {Message:lj} {Properties:j}{NewLine}{Exception}")
-    .WriteTo.Logger(errorLogger => errorLogger
-        .Filter.ByIncludingOnly(e => e.Level >= Serilog.Events.LogEventLevel.Error)
-        .WriteTo.File(
-            "logs/runtime-errors/runtime-error-.txt",
-            rollingInterval: RollingInterval.Day,
-            retainedFileCountLimit: 30,
-            outputTemplate:
-                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] ({CorrelationId}) {Message:lj}{NewLine}{Exception}{NewLine}")));
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Service", "notification-service")
+        .Enrich.WithEnvironmentName()
+        .WriteTo.Console(outputTemplate:
+            "[{Timestamp:HH:mm:ss} {Level:u3}] ({CorrelationId}) {Message:lj} {Properties:j}{NewLine}{Exception}")
+        .WriteTo.Logger(errorLogger => errorLogger
+            .Filter.ByIncludingOnly(e => e.Level >= Serilog.Events.LogEventLevel.Error)
+            .WriteTo.File(
+                "logs/runtime-errors/runtime-error-.txt",
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 30,
+                outputTemplate:
+                    "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] ({CorrelationId}) {Message:lj}{NewLine}{Exception}{NewLine}"));
+
+    // Ships to the `enterprise-seq` container (docker-compose.yml) when configured — was
+    // previously never wired on any service despite Seq running in every compose stack.
+    var seqUrl = context.Configuration["Seq:Url"];
+    if (!string.IsNullOrWhiteSpace(seqUrl))
+    {
+        configuration.WriteTo.Seq(seqUrl);
+    }
+});
 
 // ---------- Application / Infrastructure ----------
 builder.Services.AddApplication();

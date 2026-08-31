@@ -432,3 +432,30 @@ curl-based smoke test                                 create + list a real produ
 prior assumption that a YARP gateway had been added was incorrect), auth/notification frontend
 integration, the license/subscription/trial engine. See `AI-HANDOVER.md` §L for the prioritized
 next-steps list.
+
+## 2026-08-31 session (continued) — API Gateway shipped (Phase 3 core routing)
+
+Same session as the Phase 1 baseline above. Built `services/gateway` (`Gateway.Api`, YARP 2.3.0,
+its own `Gateway.sln`) — see `decisions/ADR-008-api-gateway.md` for the full design rationale.
+
+**Verified real:** `dotnet build`/`dotnet test` (3/3 hermetic tests) both 0 issues; `docker compose
+build` + `up -d` brings up all 5 API containers (gateway + 4 services) healthy; real routing
+confirmed through the running container — `GET localhost:5010/api/v1/products` reached
+`inventory-api` and got a real response, `POST localhost:5010/api/v1/auth/login` reached
+`auth-api`, `GET localhost:5010/health/services` correctly reports all 4 downstream services via
+YARP's active health checks. Uses port **5010**, not 5000 — macOS's AirPlay Receiver claims 5000
+by default, which would break `docker compose up` out of the box on every Mac (found by hitting
+exactly that conflict).
+
+**Also fixed:** `Serilog.Sinks.Seq` had never actually been wired on any of the four existing
+services (nor `shared-infrastructure`'s shared `SerilogConfiguration`), despite the `enterprise-seq`
+container running in every compose stack since Phase J — nothing had ever shipped logs to it.
+Added an optional `Seq:Url` config key (same "optional, falls back gracefully" pattern as the
+existing OTLP tracing config) to all five services now. Reconfirmed all four existing services
+still build 0/0 after the change.
+
+**Not done:** neither frontend app has been repointed at the gateway yet (still call each
+service's port directly) — the natural next step, deliberately left out of this milestone's scope.
+No auth/tenant propagation, circuit breakers, or retry policies at the gateway (see the ADR for
+why — these correctly follow, not precede, auth/tenant work happening elsewhere). See
+`AI-HANDOVER.md` §M for the full breakdown.

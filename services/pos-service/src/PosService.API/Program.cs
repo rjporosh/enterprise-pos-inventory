@@ -20,7 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 var serviceName = builder.Configuration["ServiceName"] ?? "pos-service";
 var environment = builder.Environment.EnvironmentName;
-var logger = SerilogConfiguration.CreateLogger(serviceName, environment);
+var logger = SerilogConfiguration.CreateLogger(serviceName, environment, builder.Configuration);
 builder.Host.UseSerilog(logger);
 
 builder.Services.AddObservability(serviceName, builder.Configuration);

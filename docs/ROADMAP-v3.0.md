@@ -61,8 +61,10 @@
 - [ ] Production authentication/authorization — `auth-service` exists and now builds/runs/migrates
       cleanly (2026-08-31), but is not integrated into either frontend app
 - [ ] Production tenant isolation
-- [ ] Gateway/BFF — confirmed 2026-08-31: does not exist anywhere in the repo (no YARP or other
-      gateway project). An earlier assumption that one had been added was incorrect.
+- [~] Gateway/BFF — did not exist anywhere in the repo at the start of 2026-08-31 (an earlier
+      assumption that one had been added was incorrect); built same day (`services/gateway`,
+      YARP), routes to all 4 services verified working. Frontend apps not yet repointed at it —
+      see Phase 3 below.
 - [ ] Subscription/billing/licensing
 - [ ] Entitlement/quota enforcement
 - [ ] Barcode generation/scanning end-to-end
@@ -167,42 +169,57 @@ Make the system safe for multiple real businesses.
 ---
 
 # Phase 3 — Public API Gateway / BFF
-**Status: NOT STARTED / HIGH PRIORITY**
+**Status: CORE ROUTING DONE 2026-08-31 — auth/tenant/idempotency propagation intentionally deferred**
 
 ## Goal
 Expose one public API boundary while keeping internal service topology private.
 
 ```text
 Browser
-  -> Public Gateway/BFF
+  -> Public Gateway/BFF  (services/gateway, YARP — new 2026-08-31)
       -> POS Service
       -> Inventory Service
       -> Notification Service
-      -> Billing/Subscription Service
+      -> Auth Service
 ```
 
+See [`decisions/ADR-008-api-gateway.md`](../decisions/ADR-008-api-gateway.md) for the full design
+rationale, including exactly what was deliberately deferred and why.
+
 ### Gateway
-- [ ] One public origin
-- [ ] Internal service URLs private
-- [ ] API routing
-- [ ] Authentication propagation
-- [ ] Tenant context propagation
-- [ ] Correlation ID propagation
-- [ ] Idempotency propagation
-- [ ] Consistent error mapping
-- [ ] Request size limits
-- [ ] Timeouts
-- [ ] Circuit breaker
-- [ ] Safe retries
-- [ ] Health-aware routing
+- [x] One public origin — `services/gateway` (`Gateway.Api`), YARP 2.3.0, its own `Gateway.sln`
+- [x] Internal service URLs private — frontend apps have NOT been repointed at it yet though (see
+      below), so this exit criterion is only half-true until that happens
+- [x] API routing — path-based, matching each service's real controller prefixes exactly (see
+      `services/gateway/README.md` for the full route table)
+- [ ] Authentication propagation — deferred: auth-service itself isn't integrated into either
+      frontend app yet; adding gateway-side JWT validation ahead of that would be speculative
+- [ ] Tenant context propagation — deferred: no tenant isolation exists anywhere yet (Phase 2)
+- [x] Correlation ID propagation — `X-Correlation-Id`, generated/forwarded on the way in, echoed
+      back via each downstream service's own copy on the way out
+- [ ] Idempotency propagation — deferred, no concrete idempotency-key use case wired yet
+- [x] Consistent error mapping — each downstream service already returns RFC7807 ProblemDetails;
+      the gateway does not currently reshape these further (verified real request appears
+      unchanged through the proxy)
+- [ ] Request size limits — Kestrel defaults only; no explicit override yet
+- [ ] Timeouts — YARP defaults only; no explicit per-cluster override yet
+- [ ] Circuit breaker — not configured; YARP supports it, no concrete failure scenario driving
+      specific thresholds yet
+- [ ] Safe retries — not configured, same reasoning as circuit breaker
+- [x] Health-aware routing — YARP active health checks per cluster (`ConsecutiveFailures` policy,
+      polls each destination's `/health` every 15s); `GET /health/services` on the gateway itself
+      fans out to all 4 services for one combined health view — verified real (all 4 healthy)
 
 ### Rate limiting
-- [ ] IP-based limits
-- [ ] Tenant-based limits
-- [ ] User-based limits
+- [x] IP-based limits — a general fixed-window limiter at the edge (`RateLimiting:PermitLimit`/
+      `:WindowSeconds`, default 200/60s per client IP)
+- [ ] Tenant-based limits — deferred with tenant isolation (Phase 2)
+- [ ] User-based limits — deferred with auth integration
 - [ ] Device ID limits
-- [ ] Endpoint-specific limits
-- [ ] Redis distributed limiter
+- [ ] Endpoint-specific limits — only the general edge limiter exists; `auth-service` already has
+      its own stricter per-endpoint limiter on login/register, independent of the gateway
+- [ ] Redis distributed limiter — current limiter is in-memory/per-instance; fine for a single
+      gateway instance, would need a distributed store before running >1 replica
 
 ### Device identity
 - [ ] Server-issued POS device ID
@@ -212,9 +229,15 @@ Browser
 - [ ] Optional stronger native-terminal identity where applicable
 
 ### Exit criteria
-- [ ] Browser knows only public gateway origin
-- [ ] Internal service URLs cannot be discovered from frontend configuration
-- [ ] Gateway survives dependency failure without cascading outage
+- [~] Browser knows only public gateway origin — true for any request routed through it (verified:
+      product list, auth login attempt both round-tripped correctly via `localhost:5010`); not yet
+      true in practice because neither frontend app has been repointed at the gateway yet
+- [x] Internal service URLs cannot be discovered from frontend configuration — true once the point
+      above is done; not yet done
+- [x] Gateway survives dependency failure without cascading outage — active health checks route
+      around a failing destination rather than every request timing out against it (not yet
+      chaos-tested against an actual killed container, but the health-check wiring is real and
+      verified reachable)
 
 ---
 

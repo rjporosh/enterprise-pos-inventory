@@ -683,3 +683,60 @@ gateway is much simpler to design correctly once you know what it's routing auth
 Do NOT re-verify Phase 1 from scratch — it's done and documented above with real evidence. Do
 re-run the build/test commands above once before starting new work, to confirm nothing regressed
 between sessions.
+
+---
+
+## M. API Gateway shipped — 2026-08-31 (same session as §L)
+
+Built `services/gateway` (`Gateway.Api`, YARP 2.3.0, its own `Gateway.sln`) per
+`decisions/ADR-008-api-gateway.md` — read that ADR first, it has the full rationale and exactly
+what was deliberately deferred (auth/tenant propagation, circuit breakers, retries) and why.
+
+**Verified real, not just "should work":**
+- `dotnet build Gateway.sln` → 0 errors, 0 warnings, 0 vulnerable packages.
+- `dotnet test Gateway.sln` → 3/3 hermetic tests pass (health, 404 on unmatched route, metrics).
+- `docker compose build gateway-api` → succeeds; `docker compose up -d` → all 5 API containers
+  (gateway + 4 services) healthy.
+- Real routing verified through the **running Docker container** (not a mock): `GET
+  localhost:5010/api/v1/products` returned a real (empty) paged result from `inventory-api`; `POST
+  localhost:5010/api/v1/auth/login` reached `auth-api` and got its real validation response; `GET
+  localhost:5010/health/services` returned all 4 downstream services as Healthy via YARP's active
+  health checks.
+- Port **5010**, not 5000 — macOS's AirPlay Receiver claims 5000 by default; using it would break
+  `docker compose up` out of the box on every Mac. Discovered by hitting exactly that conflict.
+
+**Also fixed in the same pass:** `SharedInfrastructure.Logging.SerilogConfiguration.CreateLogger`
+and both `auth-service`/`notification-service`'s inline Serilog setup never actually wired the
+`Serilog.Sinks.Seq` sink, despite the `enterprise-seq` container running in every compose stack
+since Phase J — nothing had ever shipped logs to it. Added an optional `Seq:Url` config key
+(same "optional, falls back gracefully" pattern as the existing OTLP tracing endpoint) to all
+five services now (four existing + gateway). Rebuilt and reconfirmed all four existing services
+still build 0/0 after this change.
+
+### What's genuinely still not done (don't re-derive from hope)
+
+- **Neither frontend app has been repointed at the gateway.** `frontend/inventory` and
+  `frontend/pos` still call their respective services' ports (`5002`, `5001`) directly. This is
+  the natural next step if continuing gateway work — should be quick (two env var changes per app)
+  but wasn't done this session to keep this milestone's scope to "build and verify the gateway
+  itself."
+- No auth/tenant context propagation at the gateway (see ADR-008 — this correctly follows, not
+  precedes, actual auth/tenant work being done elsewhere first).
+- No circuit breaker, retry policy, or explicit request-size/timeout overrides configured — YARP
+  supports all of these but none have a concrete failure scenario driving specific values yet.
+- Gateway has not been chaos-tested (e.g. killing a downstream container mid-request) — the
+  active-health-check wiring is real and verified *reachable*, but "does it actually route around
+  a genuinely dead container without dropping in-flight requests" has not been exercised.
+
+### Exact next command
+
+Per `docs/ROADMAP-v3.0.md`'s Delivery Order, next is auth integration. A reasonable order:
+
+1. Repoint both frontend apps at the gateway (`NEXT_PUBLIC_INVENTORY_API_URL=http://localhost:5010`,
+   `NEXT_PUBLIC_POS_API_URL=http://localhost:5010`) and re-run each app's full
+   typecheck/lint/test/build loop plus a manual smoke walkthrough — cheap, high-value, closes out
+   the rest of Phase 3's exit criteria.
+2. Wire `auth-service` into both frontend apps (shared JWT/refresh-token client, auth Redux slice,
+   route guards, derive `cashierId`/`userId` from the token).
+3. Then tenant isolation + the licensing/subscription/trial engine described in this
+   conversation's opening prompt — see §L's "Exact next command" for the fuller breakdown.

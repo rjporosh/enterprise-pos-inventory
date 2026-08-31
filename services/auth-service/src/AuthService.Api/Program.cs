@@ -22,13 +22,24 @@ using Serilog;
 var builder = WebApplication.CreateBuilder(args);
 
 // ---------- Serilog ----------
-builder.Host.UseSerilog((context, services, configuration) => configuration
-    .ReadFrom.Configuration(context.Configuration)
-    .Enrich.FromLogContext()
-    .Enrich.WithProperty("Service", "auth-service")
-    .Enrich.WithEnvironmentName()
-    .WriteTo.Console(outputTemplate:
-        "[{Timestamp:HH:mm:ss} {Level:u3}] ({CorrelationId}) {Message:lj} {Properties:j}{NewLine}{Exception}"));
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Service", "auth-service")
+        .Enrich.WithEnvironmentName()
+        .WriteTo.Console(outputTemplate:
+            "[{Timestamp:HH:mm:ss} {Level:u3}] ({CorrelationId}) {Message:lj} {Properties:j}{NewLine}{Exception}");
+
+    // Ships to the `enterprise-seq` container (docker-compose.yml) when configured — was
+    // previously never wired on any service despite Seq running in every compose stack.
+    var seqUrl = context.Configuration["Seq:Url"];
+    if (!string.IsNullOrWhiteSpace(seqUrl))
+    {
+        configuration.WriteTo.Seq(seqUrl);
+    }
+});
 
 // ---------- Application / Infrastructure ----------
 builder.Services.AddApplication();

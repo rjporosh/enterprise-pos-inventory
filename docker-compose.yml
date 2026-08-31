@@ -104,6 +104,7 @@ services:
       - RabbitMQ__Password=guest
       - Cors__AllowedOrigins__0=http://localhost:3000
       - Cors__AllowedOrigins__1=http://localhost:3001
+      - Seq__Url=http://seq:80
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,6 +112,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      seq:
+        condition: service_started
     networks:
       - enterprise-network
 
@@ -133,6 +136,7 @@ services:
       - RabbitMQ__Password=guest
       - Cors__AllowedOrigins__0=http://localhost:3000
       - Cors__AllowedOrigins__1=http://localhost:3001
+      - Seq__Url=http://seq:80
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,6 +144,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      seq:
+        condition: service_started
     networks:
       - enterprise-network
 
@@ -162,6 +168,7 @@ services:
       - RabbitMq__Password=guest
       - Cors__AllowedOrigins__0=http://localhost:3000
       - Cors__AllowedOrigins__1=http://localhost:3001
+      - Seq__Url=http://seq:80
     depends_on:
       postgres:
         condition: service_healthy
@@ -169,6 +176,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      seq:
+        condition: service_started
     networks:
       - enterprise-network
 
@@ -190,11 +199,45 @@ services:
       - RabbitMq__Password=guest
       - Cors__AllowedOrigins__0=http://localhost:3000
       - Cors__AllowedOrigins__1=http://localhost:3001
+      - Seq__Url=http://seq:80
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      seq:
+        condition: service_started
+    networks:
+      - enterprise-network
+
+  gateway-api:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    container_name: gateway-api
+    restart: always
+    ports:
+      # 5000 deliberately avoided — macOS's AirPlay Receiver claims it by default on every Mac,
+      # so any docker-compose up would otherwise fail with "address already in use" out of the box.
+      - "5010:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Cors__AllowedOrigins__0=http://localhost:3000
+      - Cors__AllowedOrigins__1=http://localhost:3001
+      - Seq__Url=http://seq:80
+      - Services__auth-service__HealthUrl=http://auth-api:8080/health
+      - Services__notification-service__HealthUrl=http://notification-api:8080/health
+      - Services__inventory-service__HealthUrl=http://inventory-api:8080/health
+      - Services__pos-service__HealthUrl=http://pos-api:8080/health
+      - ReverseProxy__Clusters__auth-cluster__Destinations__destination1__Address=http://auth-api:8080/
+      - ReverseProxy__Clusters__notification-cluster__Destinations__destination1__Address=http://notification-api:8080/
+      - ReverseProxy__Clusters__inventory-cluster__Destinations__destination1__Address=http://inventory-api:8080/
+      - ReverseProxy__Clusters__pos-cluster__Destinations__destination1__Address=http://pos-api:8080/
+    depends_on:
+      - auth-api
+      - notification-api
+      - inventory-api
+      - pos-api
     networks:
       - enterprise-network
 
