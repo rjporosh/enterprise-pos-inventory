@@ -9,7 +9,9 @@ obj/
 publish/
 logs/
 .vscode/
+.vs/
 .idea/
+artifacts/
 *.swp
 *.swo
 node_modules/
