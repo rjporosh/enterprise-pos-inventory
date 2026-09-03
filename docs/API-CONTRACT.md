@@ -20,47 +20,33 @@ Example:
 
 ---
 
-# Successful Response
+# Response contract — CURRENT (as of M1 C1–C6, 2026-09-03)
 
-Single resource:
+Authoritative shape and mechanics: `docs/programmers-guide/api-response-contract.md` +
+`decisions/ADR-010`. Summary:
 
+## Failure (implemented, all 5 services)
+
+```jsonc
 {
-  "success": true,
-  "data": {},
-  "meta": null
+  "success": false,
+  "message": "…",                                   // localized (?lang / Accept-Language, en default)
+  "errors": [ { "code": "…", "field": "…", "message": "…" } ],   // EVERY error, never just the first
+  "traceId": "…",
+  "timestamp": "…"
+  // transitional until M1 C7: also "type","title","detail","status" (RFC7807 aliases)
 }
+```
 
-Collection:
+HTTP status derives from the first error's `code` (`*_NOT_FOUND`→404, `*_EXISTS`→409, …).
+Unhandled 500s are `application/problem+json`, RFC 7807, scrubbed (no stack trace / SQL / secrets).
 
-{
-  "success": true,
-  "data": [],
-  "meta": {
-    "page": 1,
-    "pageSize": 25,
-    "totalCount": 100,
-    "totalPages": 4
-  }
-}
+## Success
 
----
-
-# Error Response
-
-Financial/business/API errors must expose stable machine-readable error codes.
-
-Example:
-
-{
-  "type": "...",
-  "title": "...",
-  "status": 400,
-  "code": "PRODUCT_NOT_FOUND",
-  "detail": "Product was not found.",
-  "traceId": "..."
-}
-
-Production errors must not expose internal stack traces or secrets.
+Currently the **raw resource** (bare `Guid` / DTO / `PagedResult<T>` / `204`) — unchanged from the
+original implementation. **M1 C7** wraps it as
+`{ "success": true, "message": "…", "data": …, "traceId": "…", "timestamp": "…" }` in lockstep with
+`frontend/*/src/lib/api/client.ts`. `PagedResult<T>` is `{ items, totalCount, pageNumber, pageSize }`.
 
 ---
 

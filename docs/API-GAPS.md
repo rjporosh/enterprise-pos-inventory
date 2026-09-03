@@ -46,21 +46,21 @@ here. It does not call, mock, or assume any endpoint not listed under "What exis
 | POST | `/api/v1/cash-sessions/close` | 204. |
 | GET | `/api/v1/reports/daily-sales?storeId=&reportDate=` | 404 `REPORT_NOT_FOUND` if the report hasn't been generated yet (see §3 below — this is the normal case for "today"). |
 
-### Response/error shape (verified, not from API-CONTRACT.md)
+### Response/error shape — UPDATED 2026-09-03 (M1 C1–C6)
 
-- Success responses are the **raw resource** (or `PagedResult<T>`), not a `{ success, data, meta }`
-  envelope.
-- Error responses are RFC7807 `ProblemDetails` produced via `Problem(title:, detail:, statusCode:,
-  instance:)`. `title` carries the domain error code (e.g. `PRODUCT_NOT_FOUND`,
-  `SALE_NOT_FOUND`), `detail` carries the human-readable message.
-- Several mutating endpoints return `204 No Content` with **no body**: `RemoveItem`,
-  `CompleteSale`, `VoidSale`, `CloseSession`, product/stock `DELETE`, product `PUT`. The frontend
-  API clients handle this (see `lib/api/client.ts` in both apps, `response.status === 204`).
+- **Failure responses are now the unified envelope** `{ success:false, message, errors:[{code,field,
+  message}], traceId, timestamp }` on **all 5 services** (was: 3 different shapes). **Every**
+  validation error is returned — the old bug where `inventory`/`pos` returned
+  `{title:"VALIDATION_ERROR", detail:null}` and dropped every field message is **fixed** (M1 C3).
+  Transitional RFC7807 aliases (`type`/`title`/`detail`/`status`) are still on the failure body so
+  the current frontend keeps working; removed in M1 C7.
+- Messages are **localized** (en default, bn via `?lang=`/`Accept-Language`) — M1 C6.
+- **Success responses are still the raw resource** (or `PagedResult<T>`, or `204`). M1 C7 wraps
+  them as `{ success:true, data, … }` coordinated with `frontend/*/lib/api/client.ts`.
+- `docs/API-CONTRACT.md` and `docs/programmers-guide/api-response-contract.md` now match reality.
 
-**Severity: Medium — documentation drift.** `docs/API-CONTRACT.md` describes a `{success, data,
-meta}` envelope that the live controllers do not produce. Anyone integrating against
-API-CONTRACT.md alone (rather than the controllers) will write a client that mis-parses every
-response. Recommend updating API-CONTRACT.md to match reality, or annotating it as aspirational/v2.
+**Severity: was Medium (doc drift) — now largely CLOSED.** Remaining: the success-envelope
+migration (C7) and dropping the RFC7807 aliases.
 
 ---
 
