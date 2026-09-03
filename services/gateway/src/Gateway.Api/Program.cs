@@ -6,6 +6,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
+using SharedWeb;
 using Serilog.Events;
 using Serilog.Formatting.Json;
 
@@ -40,6 +41,11 @@ builder.Host.UseSerilog(Log.Logger);
 // service's binary — only a config change.
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+
+// Same failure-envelope / scrubbed-500 contract as every downstream service, for faults that
+// originate in the gateway itself (a bad route config, an edge middleware throwing). YARP-proxied
+// responses are passed through untouched.
+builder.Services.AddPlatformExceptionHandling();
 
 // ---------- CORS ----------
 // This gateway is the single public origin the frontend apps should call once wired in (Phase 3
@@ -116,6 +122,7 @@ var app = builder.Build();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
+app.UseExceptionHandler();
 app.UseCors("AllowConfiguredOrigins");
 app.UseRateLimiter();
 

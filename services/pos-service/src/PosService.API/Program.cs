@@ -8,6 +8,7 @@ global using SharedInfrastructure.Logging;
 global using SharedInfrastructure;
 global using SharedInfrastructure.Observability;
 global using SharedInfrastructure.Persistence;
+global using SharedWeb;
 global using Microsoft.EntityFrameworkCore;
 global using Microsoft.AspNetCore.Http;
 global using System.Text.Json;
@@ -45,6 +46,7 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddSharedInfrastructure(typeof(PosService.Application.Sales.CreateSale.CreateSaleCommand).Assembly);
 builder.Services.AddDatabaseProvider(builder.Configuration);
+builder.Services.AddPlatformExceptionHandling();
 
 builder.Services.AddScoped(sp =>
 {
@@ -97,11 +99,11 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseSerilogRequestLogging();
-
 app.UseMiddleware<SharedInfrastructure.Observability.CorrelationIdMiddleware>();
 
-app.UseMiddleware<PosService.API.Middleware.GlobalExceptionHandler>();
+app.UseSerilogRequestLogging();
+
+app.UseExceptionHandler();
 
 app.UseCors("Default");
 

@@ -22,6 +22,7 @@ public class CorrelationIdMiddleware(RequestDelegate next)
             : Guid.NewGuid().ToString();
 
         context.Request.Headers[HeaderName] = correlationId;
+        context.Items["CorrelationId"] = correlationId;
 
         // Not also set on context.Response.Headers here: every downstream service already
         // echoes this same header back on its own response (see each service's

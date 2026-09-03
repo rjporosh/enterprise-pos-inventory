@@ -10,10 +10,9 @@
     <!--
       Deliberately dependency-light: the gateway is a pure edge/routing concern with no
       domain logic, so it does NOT reference shared-infrastructure (which pulls in EF Core,
-      Npgsql, MediatR, FluentValidation — none of which a reverse proxy needs). A small
-      correlation-ID middleware is duplicated locally instead (see Middleware/), the same
-      "duplicate rather than share" call already made for the two frontend apps — see
-      docs/AI-CODING-RULES.md.
+      Npgsql, MediatR — none of which a reverse proxy needs). It DOES reference shared-web,
+      the light cross-cutting web layer (ASP.NET framework ref + FluentValidation + shared-kernel),
+      so the gateway returns the same failure envelope / 500 shape as every downstream service.
     -->
     <PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
@@ -26,5 +25,9 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
     <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.15.3-beta.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\shared\shared-web\src\shared-web.csproj" />
   </ItemGroup>
 </Project>

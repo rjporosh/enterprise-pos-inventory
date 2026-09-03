@@ -67,19 +67,8 @@ public static class ResultEnvelopeMapper
             ? result.Errors.Select(e => new ApiErrorItem(e.Code, e.Description ?? e.Code, e.Field)).ToList()
             : new List<ApiErrorItem> { new(result.Error.Code, result.Error.Description ?? PlatformMessages.FailureDefault, result.Error.Field) };
 
-        var message = result.ValidationErrors.Count > 0
-            ? PlatformMessages.ValidationFailure
-            : items.Count > 0 ? items[0].Message : PlatformMessages.FailureDefault;
+        var message = result.ValidationErrors.Count > 0 ? PlatformMessages.ValidationFailure : null;
 
-        return new ApiFailureResponse(
-            Success: false,
-            Message: message,
-            Errors: items,
-            TraceId: traceId,
-            Timestamp: DateTimeOffset.UtcNow,
-            Type: Rfc7807Type,
-            Title: message,
-            Detail: items.Count > 0 ? items[0].Message : message,
-            Status: statusCode);
+        return ApiFailureResponse.FromErrors(items, traceId, statusCode, message);
     }
 }

@@ -42,4 +42,30 @@ public sealed record ApiFailureResponse(
     string Type,
     string Title,
     string? Detail,
-    int Status);
+    int Status)
+{
+    public const string Rfc7807Type = "https://tools.ietf.org/html/rfc7807";
+
+    /// <summary>Build a failure envelope from an already-materialized error list.</summary>
+    public static ApiFailureResponse FromErrors(
+        IReadOnlyList<ApiErrorItem> errors,
+        string traceId,
+        int status,
+        string? message = null)
+    {
+        var items = errors.Count > 0
+            ? errors
+            : new[] { new ApiErrorItem("ERROR", message ?? PlatformMessages.FailureDefault, null) };
+        var msg = message ?? items[0].Message;
+        return new ApiFailureResponse(
+            Success: false,
+            Message: msg,
+            Errors: items,
+            TraceId: traceId,
+            Timestamp: DateTimeOffset.UtcNow,
+            Type: Rfc7807Type,
+            Title: msg,
+            Detail: items[0].Message,
+            Status: status);
+    }
+}
