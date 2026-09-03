@@ -50,6 +50,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // Shared centralized exception handling (replaces the local ExceptionHandlingMiddleware).
 builder.Services.AddPlatformExceptionHandling();
 builder.Services.AddExceptionMapper<AuthExceptionMapper>();
+builder.Services.AddPlatformLocalization();
 
 // ---------- Auth ----------
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
@@ -203,6 +204,7 @@ var app = builder.Build();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
+app.UsePlatformLocalization();
 
 if (app.Environment.IsDevelopment())
 {

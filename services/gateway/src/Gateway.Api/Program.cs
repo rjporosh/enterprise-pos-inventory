@@ -46,6 +46,7 @@ builder.Services.AddReverseProxy()
 // originate in the gateway itself (a bad route config, an edge middleware throwing). YARP-proxied
 // responses are passed through untouched.
 builder.Services.AddPlatformExceptionHandling();
+builder.Services.AddPlatformLocalization();
 
 // ---------- CORS ----------
 // This gateway is the single public origin the frontend apps should call once wired in (Phase 3
@@ -123,6 +124,7 @@ var app = builder.Build();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
+app.UsePlatformLocalization();
 app.UseCors("AllowConfiguredOrigins");
 app.UseRateLimiter();
 

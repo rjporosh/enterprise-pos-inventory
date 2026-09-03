@@ -64,11 +64,19 @@ public static class ResultEnvelopeMapper
     public static ApiFailureResponse Failure(IResult result, string traceId, int statusCode)
     {
         var items = result.Errors.Count > 0
-            ? result.Errors.Select(e => ApiErrorItem.Of(e.Code, e.Description ?? e.Code, e.Field)).ToList()
-            : new List<ApiErrorItem> { ApiErrorItem.Of(result.Error.Code, result.Error.Description ?? PlatformMessages.FailureDefault, result.Error.Field) };
+            ? result.Errors.Select(e => ApiErrorItem.Of(e.Code, Localize(e), e.Field)).ToList()
+            : new List<ApiErrorItem> { ApiErrorItem.Of(result.Error.Code, Localize(result.Error), result.Error.Field) };
 
         var message = result.ValidationErrors.Count > 0 ? PlatformMessages.ValidationFailure : null;
 
         return ApiFailureResponse.FromErrors(items, traceId, statusCode, message);
+    }
+
+    // Keep FluentValidation's specific per-field text; localize only coded domain messages, and
+    // only when a resx entry named exactly after the code exists (else the handler's own text).
+    private static string Localize(Error e)
+    {
+        var fallback = e.Description ?? e.Code;
+        return e.Code == "VALIDATION_ERROR" ? fallback : PlatformMessages.ForCode(e.Code, fallback);
     }
 }

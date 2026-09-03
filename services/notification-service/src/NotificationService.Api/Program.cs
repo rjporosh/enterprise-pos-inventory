@@ -64,6 +64,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // Shared centralized exception handling (replaces the local ExceptionHandlingMiddleware).
 builder.Services.AddPlatformExceptionHandling();
 builder.Services.AddExceptionMapper<NotificationExceptionMapper>();
+builder.Services.AddPlatformLocalization();
 builder.Services.AddHttpContextAccessor();
 
 // ---------- Auth ----------
@@ -197,7 +198,7 @@ var app = builder.Build();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
-app.UseMiddleware<LocalizationMiddleware>();
+app.UsePlatformLocalization();
 
 if (app.Environment.IsDevelopment())
 {

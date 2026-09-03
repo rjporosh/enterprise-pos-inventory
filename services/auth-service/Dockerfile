@@ -3,6 +3,11 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
+# The aspnet:*-alpine base image runs in globalization-invariant mode (no ICU data) to stay
+# small; request localization (SharedWeb.PlatformLocalization, en/bn) needs real cultures.
+RUN apk add --no-cache icu-libs
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+
 RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
 USER appuser
 

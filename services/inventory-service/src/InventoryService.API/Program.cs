@@ -48,6 +48,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddSharedInfrastructure(typeof(InventoryService.Application.Products.CreateProduct.CreateProductCommand).Assembly);
 builder.Services.AddDatabaseProvider(builder.Configuration);
 builder.Services.AddPlatformExceptionHandling();
+builder.Services.AddPlatformLocalization();
 
 builder.Services.AddScoped(sp =>
 {
@@ -97,6 +98,8 @@ app.UseMiddleware<SharedInfrastructure.Observability.CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 
 app.UseExceptionHandler();
+
+app.UsePlatformLocalization();
 
 app.UseCors("Default");
 

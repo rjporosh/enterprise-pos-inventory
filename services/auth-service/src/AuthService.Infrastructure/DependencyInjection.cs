@@ -1,5 +1,4 @@
 using AuthService.Application.Common.Interfaces;
-using AuthService.Application.Common.Services;
 using AuthService.Infrastructure.Caching;
 using AuthService.Infrastructure.Common;
 using AuthService.Infrastructure.Jobs;
@@ -31,8 +30,6 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddSingleton<ITokenService, JwtTokenService>();
-
-        services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddScoped<IEmailSender, EmailSender>();
         services.AddScoped<ISmsSender, SmsSender>();
         services.AddScoped<IOtpService, OtpService>();
