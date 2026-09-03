@@ -1,4 +1,5 @@
 using MediatR;
+using SharedKernel;
 using NotificationService.Application.Common.Models;
 using NotificationService.Application.Features.Release;
 

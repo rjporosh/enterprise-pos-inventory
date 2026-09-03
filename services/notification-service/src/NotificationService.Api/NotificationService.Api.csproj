@@ -48,6 +48,8 @@
   <ItemGroup>
     <ProjectReference Include="..\NotificationService.Application\NotificationService.Application.csproj" />
     <ProjectReference Include="..\NotificationService.Infrastructure\NotificationService.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\..\shared\shared-kernel\src\shared-kernel.csproj" />
+    <ProjectReference Include="..\..\..\..\shared\shared-web\src\shared-web.csproj" />
   </ItemGroup>
 
 </Project>

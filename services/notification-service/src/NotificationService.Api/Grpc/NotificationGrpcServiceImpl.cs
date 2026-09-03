@@ -38,7 +38,7 @@ public sealed class NotificationGrpcServiceImpl : NotificationGrpcService.Notifi
 
         if (!result.IsSuccess)
         {
-            var message = string.Join("; ", result.Errors.Select(e => e.Message));
+            var message = string.Join("; ", result.Errors.Select(e => e.Description));
             throw new RpcException(new Status(StatusCode.FailedPrecondition, message));
         }
 
@@ -56,7 +56,7 @@ public sealed class NotificationGrpcServiceImpl : NotificationGrpcService.Notifi
 
         var result = await _mediator.Send(new GetNotificationByIdQuery(notificationId), context.CancellationToken);
         if (!result.IsSuccess)
-            throw new RpcException(new Status(StatusCode.NotFound, result.Errors.First().Message));
+            throw new RpcException(new Status(StatusCode.NotFound, result.Errors.First().Description ?? "Notification not found."));
 
         return new GetNotificationStatusReply
         {

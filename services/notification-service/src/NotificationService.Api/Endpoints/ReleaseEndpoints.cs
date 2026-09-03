@@ -12,7 +12,7 @@ public static class ReleaseEndpoints
             .WithName("GetReleaseInfo")
             .WithSummary("SQA/tester endpoint: returns current service release/change information.")
             .WithTags("Release")
-            .Produces<ApiResponse<ReleaseInfoDto>>(StatusCodes.Status200OK);
+            .Produces<SharedWeb.ApiResponse<ReleaseInfoDto>>(StatusCodes.Status200OK);
     }
 
     private static async Task<IResult> GetReleaseAsync(IMediator mediator, HttpContext httpContext, CancellationToken cancellationToken)

@@ -177,7 +177,7 @@ public sealed class NotificationEventConsumer : BackgroundService
 
             if (!result.IsSuccess)
                 _logger.LogWarning("SendNotification from event '{RoutingKey}' returned validation errors: {Errors}",
-                    routingKey, string.Join("; ", result.Errors.Select(e => e.Message)));
+                    routingKey, string.Join("; ", result.Errors.Select(e => e.Description)));
 
             _channel!.BasicAck(args.DeliveryTag, multiple: false);
         }

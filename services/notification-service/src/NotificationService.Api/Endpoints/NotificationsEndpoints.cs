@@ -18,20 +18,20 @@ public static class NotificationsEndpoints
         group.MapPost("/", SendAsync)
             .WithName("SendNotification")
             .WithSummary("Send or schedule a notification on one channel (Email/SMS/Push).")
-            .Produces<ApiResponse<SendNotificationResultDto>>(StatusCodes.Status201Created)
+            .Produces<SharedWeb.ApiResponse<SendNotificationResultDto>>(StatusCodes.Status201Created)
             .Produces(StatusCodes.Status400BadRequest)
             .RequireRateLimiting("notification-write");
 
         group.MapGet("/{id:guid}", GetByIdAsync)
             .WithName("GetNotificationById")
             .WithSummary("Get a single notification, including its delivery-attempt log.")
-            .Produces<ApiResponse<NotificationDto>>(StatusCodes.Status200OK)
+            .Produces<SharedWeb.ApiResponse<NotificationDto>>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/", GetListAsync)
             .WithName("GetNotifications")
             .WithSummary("Paged, filterable, searchable notification history.")
-            .Produces<ApiResponse<object>>(StatusCodes.Status200OK);
+            .Produces<SharedWeb.ApiResponse<object>>(StatusCodes.Status200OK);
 
         group.MapPost("/{id:guid}/cancel", CancelAsync)
             .WithName("CancelNotification")

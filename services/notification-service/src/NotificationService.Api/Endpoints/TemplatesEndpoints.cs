@@ -18,24 +18,24 @@ public static class TemplatesEndpoints
         group.MapPost("/", CreateAsync)
             .WithName("CreateTemplate")
             .WithSummary("Create a notification template for one channel + locale.")
-            .Produces<ApiResponse<TemplateDto>>(StatusCodes.Status201Created)
+            .Produces<SharedWeb.ApiResponse<TemplateDto>>(StatusCodes.Status201Created)
             .Produces(StatusCodes.Status409Conflict);
 
         group.MapPut("/{id:guid}", UpdateAsync)
             .WithName("UpdateTemplate")
             .WithSummary("Update a template's content (creates a new version).")
-            .Produces<ApiResponse<TemplateDto>>(StatusCodes.Status200OK)
+            .Produces<SharedWeb.ApiResponse<TemplateDto>>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/{id:guid}", GetByIdAsync)
             .WithName("GetTemplateById")
-            .Produces<ApiResponse<TemplateDto>>(StatusCodes.Status200OK)
+            .Produces<SharedWeb.ApiResponse<TemplateDto>>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/", GetListAsync)
             .WithName("GetTemplates")
             .WithSummary("Paged, filterable, searchable template listing.")
-            .Produces<ApiResponse<object>>(StatusCodes.Status200OK);
+            .Produces<SharedWeb.ApiResponse<object>>(StatusCodes.Status200OK);
 
         group.MapDelete("/{id:guid}", DeleteAsync)
             .WithName("DeleteTemplate")

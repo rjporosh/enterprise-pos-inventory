@@ -1,5 +1,6 @@
 using MediatR;
 using NotificationService.Application.Common.Interfaces;
+using SharedKernel;
 using NotificationService.Application.Common.Models;
 using NotificationService.Domain.Exceptions;
 

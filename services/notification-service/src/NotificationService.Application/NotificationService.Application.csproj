@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NotificationService.Domain\NotificationService.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\shared\shared-kernel\src\shared-kernel.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using NotificationService.Application.Common.Interfaces;
+using SharedKernel;
 using NotificationService.Application.Common.Models;
 using NotificationService.Domain.Entities;
 using NotificationService.Domain.Enums;
