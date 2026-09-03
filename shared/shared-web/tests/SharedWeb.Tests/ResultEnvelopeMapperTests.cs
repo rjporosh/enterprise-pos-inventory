@@ -48,7 +48,7 @@ public class ResultEnvelopeMapperTests
         status.Should().Be(400);
         body.Success.Should().BeFalse();
         body.Errors.Should().HaveCount(2);
-        body.Errors.Select(e => e.Field).Should().BeEquivalentTo(new[] { "Name", "Price" });
+        body.Errors.Select(e => e.Field).Should().BeEquivalentTo(new[] { "name", "price" });
         body.Errors.Should().OnlyContain(e => e.Code == "VALIDATION_ERROR");
         body.Message.Should().Be(PlatformMessages.ValidationFailure);
         // transitional RFC7807 aliases so current clients keep resolving problem.detail/title
@@ -96,6 +96,17 @@ public class ResultEnvelopeMapperTests
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(body, Json));
         doc.RootElement.GetProperty("errors")[0].TryGetProperty("field", out _)
             .Should().BeFalse("a null field is omitted from the wire");
+    }
+
+    [Theory]
+    [InlineData("Request.CostPrice", "costPrice")]
+    [InlineData("Command.Name", "name")]
+    [InlineData("Sku", "sku")]
+    [InlineData("barcode", "barcode")]
+    [InlineData(null, null)]
+    public void Field_names_are_normalized_for_the_frontend(string? input, string? expected)
+    {
+        ApiErrorItem.NormalizeField(input).Should().Be(expected);
     }
 
     [Fact]

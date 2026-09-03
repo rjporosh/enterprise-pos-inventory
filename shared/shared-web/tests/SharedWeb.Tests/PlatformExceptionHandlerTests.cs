@@ -59,7 +59,7 @@ public class PlatformExceptionHandlerTests
         contentType.Should().StartWith("application/json");
         body.GetProperty("success").GetBoolean().Should().BeFalse();
         body.GetProperty("errors").GetArrayLength().Should().Be(2);
-        body.GetProperty("errors")[0].GetProperty("field").GetString().Should().Be("Email");
+        body.GetProperty("errors")[0].GetProperty("field").GetString().Should().Be("email");
         body.GetProperty("errors")[1].GetProperty("code").GetString().Should().Be("VALIDATION_ERROR");
     }
 

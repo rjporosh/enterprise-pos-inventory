@@ -5,7 +5,37 @@ namespace SharedWeb;
 /// <c>{ "code": "...", "field": "...", "message": "..." }</c> — <c>field</c> is null for
 /// errors not tied to a single input (business-rule / not-found).
 /// </summary>
-public sealed record ApiErrorItem(string Code, string Message, string? Field);
+public sealed record ApiErrorItem(string Code, string Message, string? Field)
+{
+    /// <summary>
+    /// Build an item, normalizing the field name so it lines up with a frontend form input:
+    /// drops a leading <c>request.</c>/<c>command.</c>/<c>query.</c>/<c>dto.</c> segment that
+    /// FluentValidation adds for wrapped-request commands, and camelCases the first letter.
+    /// </summary>
+    public static ApiErrorItem Of(string code, string message, string? field) =>
+        new(code, message, NormalizeField(field));
+
+    public static string? NormalizeField(string? field)
+    {
+        if (string.IsNullOrWhiteSpace(field))
+            return null;
+
+        var value = field.Trim();
+        foreach (var prefix in new[] { "request.", "command.", "query.", "dto.", "model." })
+        {
+            if (value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                value = value[prefix.Length..];
+                break;
+            }
+        }
+
+        if (value.Length == 0)
+            return null;
+
+        return char.IsUpper(value[0]) ? char.ToLowerInvariant(value[0]) + value[1..] : value;
+    }
+}
 
 /// <summary>
 /// The success half of the platform's single API response contract (see

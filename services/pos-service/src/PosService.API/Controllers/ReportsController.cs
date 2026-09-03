@@ -1,29 +1,21 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using SharedWeb;
 using PosService.Application.Reporting;
 
 namespace PosService.API.Controllers;
 
 [ApiController]
 [Route("api/v1/reports")]
+[Produces("application/json")]
 public class ReportsController(IMediator mediator) : ControllerBase
 {
     [HttpGet("daily-sales")]
-    [ProducesResponseType(typeof(DailySalesReportDto), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
+    [ProducesResponseType(typeof(DailySalesReportDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiFailureResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetDailySales([FromQuery] Guid storeId, [FromQuery] DateOnly reportDate, CancellationToken ct)
     {
         var result = await mediator.Send(new GetDailySalesReportQuery(storeId, reportDate), ct);
-
-        if (!result.IsSuccess)
-        {
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: StatusCodes.Status404NotFound,
-                instance: HttpContext.Request.Path);
-        }
-
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 }

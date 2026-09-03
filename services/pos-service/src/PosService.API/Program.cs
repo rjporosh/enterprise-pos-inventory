@@ -40,6 +40,7 @@ builder.Services.AddControllers()
         opts.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
         opts.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
     });
+builder.Services.ConfigurePlatformApiBehavior();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();

@@ -64,8 +64,8 @@ public static class ResultEnvelopeMapper
     public static ApiFailureResponse Failure(IResult result, string traceId, int statusCode)
     {
         var items = result.Errors.Count > 0
-            ? result.Errors.Select(e => new ApiErrorItem(e.Code, e.Description ?? e.Code, e.Field)).ToList()
-            : new List<ApiErrorItem> { new(result.Error.Code, result.Error.Description ?? PlatformMessages.FailureDefault, result.Error.Field) };
+            ? result.Errors.Select(e => ApiErrorItem.Of(e.Code, e.Description ?? e.Code, e.Field)).ToList()
+            : new List<ApiErrorItem> { ApiErrorItem.Of(result.Error.Code, result.Error.Description ?? PlatformMessages.FailureDefault, result.Error.Field) };
 
         var message = result.ValidationErrors.Count > 0 ? PlatformMessages.ValidationFailure : null;
 

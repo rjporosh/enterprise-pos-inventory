@@ -7,9 +7,16 @@ namespace SharedWeb;
 
 /// <summary>
 /// MVC-controller helpers that render a <see cref="SharedKernel.Result"/> /
-/// <see cref="SharedKernel.Result{T}"/> into the platform API envelope. Applied per endpoint
-/// (not a global filter) so health / OpenAPI / release endpoints and any not-yet-migrated
-/// success shapes are left untouched.
+/// <see cref="SharedKernel.Result{T}"/> into the platform contract. Applied per endpoint (not a
+/// global filter) so health / OpenAPI / release endpoints stay untouched.
+///
+/// <para>
+/// <b>Failure</b> always becomes the platform failure envelope (every error, mapped HTTP status).
+/// <b>Success</b> is raw by default — the resource value, or 204 for a payload-less
+/// <see cref="Result"/> — matching the pre-existing contract; pass <c>wrapSuccess: true</c> to
+/// wrap it in <see cref="ApiResponse{T}"/> (done service-by-service in M1 C7, in lockstep with
+/// the frontend clients).
+/// </para>
 /// </summary>
 public static class ControllerBaseExtensions
 {
@@ -17,35 +24,38 @@ public static class ControllerBaseExtensions
         this ControllerBase controller,
         Result<T> result,
         Func<Error, int>? statusOverride = null,
+        bool wrapSuccess = false,
         string? successMessage = null)
     {
-        var traceId = TraceId(controller);
-        if (result.IsSuccess)
-            return new OkObjectResult(ApiResponse<T>.Ok(result.Value!, traceId, successMessage ?? PlatformMessages.SuccessDefault));
+        if (!result.IsSuccess)
+            return FailureResult(result, TraceId(controller), statusOverride);
 
-        return FailureResult(result, traceId, statusOverride);
+        return wrapSuccess
+            ? new OkObjectResult(ApiResponse<T>.Ok(result.Value!, TraceId(controller), successMessage ?? PlatformMessages.SuccessDefault))
+            : new OkObjectResult(result.Value);
     }
 
     public static IActionResult ToApiResult(
         this ControllerBase controller,
         Result result,
         Func<Error, int>? statusOverride = null,
+        bool wrapSuccess = false,
         string? successMessage = null)
     {
-        var traceId = TraceId(controller);
-        if (result.IsSuccess)
-            return new OkObjectResult(ApiResponse<object?>.Ok(null, traceId, successMessage ?? PlatformMessages.SuccessDefault));
+        if (!result.IsSuccess)
+            return FailureResult(result, TraceId(controller), statusOverride);
 
-        return FailureResult(result, traceId, statusOverride);
+        return wrapSuccess
+            ? new OkObjectResult(ApiResponse<object?>.Ok(null, TraceId(controller), successMessage ?? PlatformMessages.SuccessDefault))
+            : new NoContentResult();
     }
 
     /// <summary>A 400 failure envelope for a pre-handler check (e.g. route/body id mismatch).</summary>
     public static IActionResult ValidationEnvelope(this ControllerBase controller, string field, string code, string message)
     {
-        var traceId = TraceId(controller);
         var body = ResultEnvelopeMapper.Failure(
             Result.Failure(new Error(code, message, field)),
-            traceId,
+            TraceId(controller),
             StatusCodes.Status400BadRequest);
         return new ObjectResult(body) { StatusCode = StatusCodes.Status400BadRequest };
     }

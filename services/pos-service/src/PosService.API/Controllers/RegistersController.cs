@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using SharedWeb;
 using PosService.Application.Registers.CreateRegister;
 using PosService.Application.Registers.Dtos;
 using PosService.Application.Registers.GetAllRegisters;
@@ -9,35 +10,28 @@ namespace PosService.API.Controllers;
 
 [ApiController]
 [Route("api/v1/registers")]
+[Produces("application/json")]
+[ProducesResponseType(typeof(ApiFailureResponse), StatusCodes.Status400BadRequest)]
+[ProducesResponseType(typeof(ApiFailureResponse), StatusCodes.Status404NotFound)]
 public class RegistersController(IMediator mediator, ILogger<RegistersController> logger) : ControllerBase
 {
     [HttpPost]
-    [ProducesResponseType(typeof(Guid), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 400)]
+    [ProducesResponseType(typeof(Guid), StatusCodes.Status200OK)]
     public async Task<IActionResult> Create([FromBody] CreateRegisterRequest request, CancellationToken ct)
     {
         var result = await mediator.Send(new CreateRegisterCommand(request), ct);
-
-        if (!result.IsSuccess)
-        {
-            var statusCode = result.Error.Code == "STORE_NOT_FOUND" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest;
+        if (result.IsSuccess)
+            logger.LogInformation("Created register {RegisterId}", result.Value);
+        else
             logger.LogWarning("Failed to create register: {Error}", result.Error);
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: statusCode,
-                instance: HttpContext.Request.Path);
-        }
-
-        logger.LogInformation("Created register {RegisterId}", result.Value);
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyList<RegisterDto>), 200)]
+    [ProducesResponseType(typeof(IReadOnlyList<RegisterDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll([FromQuery] Guid? storeId, CancellationToken ct)
     {
         var result = await mediator.Send(new GetAllRegistersQuery(storeId), ct);
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 }

@@ -5,8 +5,10 @@ namespace SharedWeb;
 
 /// <summary>
 /// Minimal-API equivalent of <see cref="ControllerBaseExtensions"/> — for auth-service and
-/// notification-service, whose endpoints return <see cref="IResult"/>. Same envelope, same
-/// status mapping (both go through <see cref="ResultEnvelopeMapper"/>).
+/// notification-service, whose endpoints return <see cref="Microsoft.AspNetCore.Http.IResult"/>.
+/// Same envelope, same status mapping. <paramref name="wrapSuccess"/> defaults to true here
+/// because the services that use these already return an <see cref="ApiResponse{T}"/> envelope
+/// on success (notification) or are migrated to it in the same pass (auth).
 /// </summary>
 public static class MinimalApiResultExtensions
 {
@@ -14,13 +16,30 @@ public static class MinimalApiResultExtensions
         this Result<T> result,
         HttpContext http,
         Func<Error, int>? statusOverride = null,
+        bool wrapSuccess = true,
         string? successMessage = null)
     {
-        var traceId = TraceId(http);
-        if (result.IsSuccess)
-            return Results.Ok(ApiResponse<T>.Ok(result.Value!, traceId, successMessage ?? PlatformMessages.SuccessDefault));
+        if (!result.IsSuccess)
+            return Failure(result, TraceId(http), statusOverride);
 
-        return Failure(result, traceId, statusOverride);
+        return wrapSuccess
+            ? Results.Ok(ApiResponse<T>.Ok(result.Value!, TraceId(http), successMessage ?? PlatformMessages.SuccessDefault))
+            : Results.Ok(result.Value);
+    }
+
+    public static Microsoft.AspNetCore.Http.IResult ToApiResult(
+        this Result result,
+        HttpContext http,
+        Func<Error, int>? statusOverride = null,
+        bool wrapSuccess = true,
+        string? successMessage = null)
+    {
+        if (!result.IsSuccess)
+            return Failure(result, TraceId(http), statusOverride);
+
+        return wrapSuccess
+            ? Results.Ok(ApiResponse<object?>.Ok(null, TraceId(http), successMessage ?? PlatformMessages.SuccessDefault))
+            : Results.NoContent();
     }
 
     public static Microsoft.AspNetCore.Http.IResult ToCreatedApiResult<T>(
@@ -30,24 +49,10 @@ public static class MinimalApiResultExtensions
         Func<Error, int>? statusOverride = null,
         string? successMessage = null)
     {
-        var traceId = TraceId(http);
-        if (result.IsSuccess)
-            return Results.Created(location, ApiResponse<T>.Ok(result.Value!, traceId, successMessage ?? PlatformMessages.CreatedDefault));
+        if (!result.IsSuccess)
+            return Failure(result, TraceId(http), statusOverride);
 
-        return Failure(result, traceId, statusOverride);
-    }
-
-    public static Microsoft.AspNetCore.Http.IResult ToApiResult(
-        this Result result,
-        HttpContext http,
-        Func<Error, int>? statusOverride = null,
-        string? successMessage = null)
-    {
-        var traceId = TraceId(http);
-        if (result.IsSuccess)
-            return Results.Ok(ApiResponse<object?>.Ok(null, traceId, successMessage ?? PlatformMessages.SuccessDefault));
-
-        return Failure(result, traceId, statusOverride);
+        return Results.Created(location, ApiResponse<T>.Ok(result.Value!, TraceId(http), successMessage ?? PlatformMessages.CreatedDefault));
     }
 
     private static Microsoft.AspNetCore.Http.IResult Failure(SharedKernel.IResult result, string traceId, Func<Error, int>? statusOverride)

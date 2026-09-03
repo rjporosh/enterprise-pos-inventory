@@ -44,7 +44,7 @@ public sealed class PlatformExceptionHandler(
         if (exception is ValidationException validation)
         {
             var items = validation.Errors
-                .Select(e => new ApiErrorItem("VALIDATION_ERROR", e.ErrorMessage, e.PropertyName))
+                .Select(e => ApiErrorItem.Of("VALIDATION_ERROR", e.ErrorMessage, e.PropertyName))
                 .ToList();
             if (items.Count == 0)
                 items.Add(new ApiErrorItem("VALIDATION_ERROR", PlatformMessages.ValidationFailure, null));

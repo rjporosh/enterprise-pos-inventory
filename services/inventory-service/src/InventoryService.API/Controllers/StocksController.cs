@@ -1,63 +1,42 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using SharedKernel;
+using SharedWeb;
+using Stock = InventoryService.Application.Stock;
 
 namespace InventoryService.API.Controllers;
 
 [ApiController]
 [Route("api/v1/stocks")]
+[Produces("application/json")]
+[ProducesResponseType(typeof(ApiFailureResponse), StatusCodes.Status400BadRequest)]
+[ProducesResponseType(typeof(ApiFailureResponse), StatusCodes.Status404NotFound)]
 public class StocksController(IMediator mediator, ILogger<StocksController> logger) : ControllerBase
 {
     [HttpPost]
-    [ProducesResponseType(typeof(global::InventoryService.Application.Stock.StockDto), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 400)]
-    [ProducesResponseType(typeof(ProblemDetails), 500)]
-    public async Task<IActionResult> Create([FromBody] global::InventoryService.Application.Stock.CreateStockRequest request, CancellationToken ct)
+    [ProducesResponseType(typeof(Stock.StockDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Create([FromBody] Stock.CreateStockRequest request, CancellationToken ct)
     {
-        var command = new global::InventoryService.Application.Stock.CreateStockCommand(request);
-        var result = await mediator.Send(command, ct);
-
-        if (!result.IsSuccess)
-        {
+        var result = await mediator.Send(new Stock.CreateStockCommand(request), ct);
+        if (result.IsSuccess)
+            logger.LogInformation("Created stock record {StockId}", result.Value!.Id);
+        else
             logger.LogWarning("Failed to create stock record: {Error}", result.Error);
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: StatusCodes.Status400BadRequest,
-                instance: HttpContext.Request.Path);
-        }
-
-        logger.LogInformation("Created stock record {StockId}", result.Value!.Id);
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(global::InventoryService.Application.Stock.StockDto), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
-    [ProducesResponseType(typeof(ProblemDetails), 500)]
+    [ProducesResponseType(typeof(Stock.StockDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
-        var query = new global::InventoryService.Application.Stock.GetStockByIdQuery(id);
-        var result = await mediator.Send(query, ct);
-
+        var result = await mediator.Send(new Stock.GetStockByIdQuery(id), ct);
         if (!result.IsSuccess)
-        {
             logger.LogWarning("Stock record {StockId} not found: {Error}", id, result.Error);
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: StatusCodes.Status404NotFound,
-                instance: HttpContext.Request.Path);
-        }
-
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(global::InventoryService.Application.Stock.PagedResult<global::InventoryService.Application.Stock.StockListItemDto>), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 400)]
-    [ProducesResponseType(typeof(ProblemDetails), 500)]
+    [ProducesResponseType(typeof(Stock.PagedResult<Stock.StockListItemDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,
@@ -69,186 +48,73 @@ public class StocksController(IMediator mediator, ILogger<StocksController> logg
         [FromQuery] bool sortDescending = false,
         CancellationToken ct = default)
     {
-        var query = new global::InventoryService.Application.Stock.GetAllStocksQuery(pageNumber, pageSize, productId, warehouseId, lowStock, outOfStock, sortBy, sortDescending);
-        var result = await mediator.Send(query, ct);
-
+        var result = await mediator.Send(
+            new Stock.GetAllStocksQuery(pageNumber, pageSize, productId, warehouseId, lowStock, outOfStock, sortBy, sortDescending), ct);
         if (!result.IsSuccess)
-        {
             logger.LogWarning("Failed to get stocks: {Error}", result.Error);
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: StatusCodes.Status400BadRequest,
-                instance: HttpContext.Request.Path);
-        }
-
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 
     [HttpPut("{id:guid}")]
-    [ProducesResponseType(typeof(global::InventoryService.Application.Stock.StockDto), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 400)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
-    [ProducesResponseType(typeof(ProblemDetails), 500)]
-    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] global::InventoryService.Application.Stock.UpdateStockRequest request, CancellationToken ct)
+    [ProducesResponseType(typeof(Stock.StockDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] Stock.UpdateStockRequest request, CancellationToken ct)
     {
         if (id != request.Id)
-        {
-            return Problem(
-                title: "ID_MISMATCH",
-                detail: "Route ID and request body ID do not match.",
-                statusCode: StatusCodes.Status400BadRequest,
-                instance: HttpContext.Request.Path);
-        }
+            return this.ValidationEnvelope("id", "ID_MISMATCH", "Route ID and request body ID do not match.");
 
-        var command = new global::InventoryService.Application.Stock.UpdateStockCommand(request);
-        var result = await mediator.Send(command, ct);
-
+        var result = await mediator.Send(new Stock.UpdateStockCommand(request), ct);
         if (!result.IsSuccess)
-        {
-            var statusCode = result.Error.Code is "STOCK_NOT_FOUND" or "STOCK_DELETED"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
             logger.LogWarning("Failed to update stock {StockId}: {Error}", id, result.Error);
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: statusCode,
-                instance: HttpContext.Request.Path);
-        }
-
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 
     [HttpDelete("{id:guid}")]
-    [ProducesResponseType(204)]
-    [ProducesResponseType(typeof(ProblemDetails), 400)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
-    [ProducesResponseType(typeof(ProblemDetails), 500)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken ct)
     {
-        var command = new global::InventoryService.Application.Stock.DeleteStockCommand(id);
-        var result = await mediator.Send(command, ct);
-
+        var result = await mediator.Send(new Stock.DeleteStockCommand(id), ct);
         if (!result.IsSuccess)
-        {
-            var statusCode = result.Error.Code is "STOCK_NOT_FOUND" or "STOCK_ALREADY_DELETED"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
             logger.LogWarning("Failed to delete stock {StockId}: {Error}", id, result.Error);
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: statusCode,
-                instance: HttpContext.Request.Path);
-        }
-
-        return NoContent();
+        return this.ToApiResult(result);
     }
 
     [HttpPost("in")]
-    [ProducesResponseType(typeof(global::InventoryService.Application.Stock.StockMovementDto), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 400)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
-    [ProducesResponseType(typeof(ProblemDetails), 500)]
-    public async Task<IActionResult> StockIn([FromBody] global::InventoryService.Application.Stock.StockInCommand command, CancellationToken ct)
+    [ProducesResponseType(typeof(Stock.StockMovementDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> StockIn([FromBody] Stock.StockInCommand command, CancellationToken ct)
     {
         var result = await mediator.Send(command, ct);
-
         if (!result.IsSuccess)
-        {
-            var statusCode = result.Error.Code is "STOCK_NOT_FOUND" or "STOCK_DELETED"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
             logger.LogWarning("Stock In failed: {Error}", result.Error);
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: statusCode,
-                instance: HttpContext.Request.Path);
-        }
-
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 
     [HttpPost("out")]
-    [ProducesResponseType(typeof(global::InventoryService.Application.Stock.StockMovementDto), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 400)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
-    [ProducesResponseType(typeof(ProblemDetails), 500)]
-    public async Task<IActionResult> StockOut([FromBody] global::InventoryService.Application.Stock.StockOutCommand command, CancellationToken ct)
+    [ProducesResponseType(typeof(Stock.StockMovementDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> StockOut([FromBody] Stock.StockOutCommand command, CancellationToken ct)
     {
         var result = await mediator.Send(command, ct);
-
         if (!result.IsSuccess)
-        {
-            var statusCode = result.Error.Code is "STOCK_NOT_FOUND" or "STOCK_DELETED"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
             logger.LogWarning("Stock Out failed: {Error}", result.Error);
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: statusCode,
-                instance: HttpContext.Request.Path);
-        }
-
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 
     [HttpPost("adjustment")]
-    [ProducesResponseType(typeof(global::InventoryService.Application.Stock.StockMovementDto), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 400)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
-    [ProducesResponseType(typeof(ProblemDetails), 500)]
-    public async Task<IActionResult> Adjustment([FromBody] global::InventoryService.Application.Stock.StockAdjustmentCommand command, CancellationToken ct)
+    [ProducesResponseType(typeof(Stock.StockMovementDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Adjustment([FromBody] Stock.StockAdjustmentCommand command, CancellationToken ct)
     {
         var result = await mediator.Send(command, ct);
-
         if (!result.IsSuccess)
-        {
-            var statusCode = result.Error.Code is "STOCK_NOT_FOUND" or "STOCK_DELETED"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
             logger.LogWarning("Stock Adjustment failed: {Error}", result.Error);
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: statusCode,
-                instance: HttpContext.Request.Path);
-        }
-
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 
     [HttpPost("transfer")]
-    [ProducesResponseType(typeof(global::InventoryService.Application.Stock.StockMovementDto), 200)]
-    [ProducesResponseType(typeof(ProblemDetails), 400)]
-    [ProducesResponseType(typeof(ProblemDetails), 404)]
-    [ProducesResponseType(typeof(ProblemDetails), 500)]
-    public async Task<IActionResult> Transfer([FromBody] global::InventoryService.Application.Stock.StockTransferCommand command, CancellationToken ct)
+    [ProducesResponseType(typeof(Stock.StockMovementDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Transfer([FromBody] Stock.StockTransferCommand command, CancellationToken ct)
     {
         var result = await mediator.Send(command, ct);
-
         if (!result.IsSuccess)
-        {
-            var statusCode = result.Error.Code is "STOCK_NOT_FOUND" or "STOCK_DELETED"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
             logger.LogWarning("Stock Transfer failed: {Error}", result.Error);
-            return Problem(
-                title: result.Error.Code,
-                detail: result.Error.Description,
-                statusCode: statusCode,
-                instance: HttpContext.Request.Path);
-        }
-
-        return Ok(result.Value);
+        return this.ToApiResult(result);
     }
 }
