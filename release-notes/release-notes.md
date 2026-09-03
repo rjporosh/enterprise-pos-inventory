@@ -561,3 +561,64 @@ have blocked any real deployment or usage — see `AI-HANDOVER.md` §L–§P for
 evidence. All five backend services build 0 errors/0 warnings, all tests pass (67+ unit, 8
 integration), all run in Docker with passing health checks, and the full login → catalog → POS
 checkout path was verified end-to-end through a real browser against the live stack.
+
+## 2026-09-03/04 session — M1: unified cross-cutting web layer (backend foundation)
+
+**Environment:** real .NET 10.0.400 SDK + Docker.
+
+Started the multi-milestone "production hardening" plan (all 5 tracks + offline sync, depth-first).
+**Milestone M1 — the backend cross-cutting foundation — is C1–C6 + C8 complete** (7 commits
+`e3dce39`..`1956ffb`); C7 (the one coordinated frontend+backend change) and M2–M10 remain. Full
+detail in `AI-HANDOVER.md` §Q and `decisions/ADR-010-cross-cutting-web-layer.md`.
+
+### What changed
+
+- **One `Result`.** The three incompatible `Result`/`Error` types (`shared-kernel`, `auth`,
+  `notification`) are now one — `SharedKernel.Result`/`Result<T>`, extended with an optional
+  `Error.Field`, an `Errors` list, and `Failure(IEnumerable<Error>)`. `auth`'s and `notification`'s
+  local copies deleted.
+- **One response contract.** New `shared/shared-web` leaf project (ASP.NET framework ref +
+  FluentValidation + `shared-kernel` only — no EF/Npgsql/MediatR, so `auth`/`notification`/`gateway`
+  can use it). `{ success:false, message, errors:[{code,field,message}], traceId, timestamp }` on
+  **all 5 services**, localized. `ApiErrorItem.Of()` normalizes field names to frontend inputs.
+- **The all-errors validation bug is fixed.** `inventory`/`pos` controllers previously read only
+  `result.Error.Code` and returned `400 {title:"VALIDATION_ERROR", detail:null}` — every
+  FluentValidation field message was discarded. Now every failure routes through
+  `ResultEnvelopeMapper` and **all** errors are returned. The `[ApiController]` model-validation
+  400 is reshaped to the same envelope.
+- **One centralized exception handler.** `SharedWeb.PlatformExceptionHandler` (`IExceptionHandler`)
+  replaces the four near-duplicate middlewares (the gateway had none). Scrubbed RFC7807 500 — never
+  a stack trace / SQL / connection string; `traceId` + `X-Correlation-Id` always; structured
+  `Error` log with `RootCause`/`PossibleSolution` for `logs/runtime-errors/`. Per-service domain
+  exceptions via `IExceptionMapper` (`AuthExceptionMapper`, `NotificationExceptionMapper`).
+- **Request localization (en/bn).** `SharedWeb.PlatformLocalization` — `?lang=` → `Accept-Language`
+  → user `locale` claim → `en`; resource-based (`PlatformMessages[.bn].resx`), extensible by
+  adding a culture code + one resx. Domain error messages localize incrementally (add a resx key
+  named after the `Error.Code`; no handler change). Fixes `notification`'s static-culture leak.
+- **Dockerfile fix:** `inventory`/`pos`/`gateway`/`auth` images crash-looped (exit 139,
+  `CultureNotFoundException`) on the alpine base's globalization-invariant mode — added
+  `apk add --no-cache icu-libs` + `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`
+  (`notification`'s Dockerfile already had it).
+- **Docs:** `ADR-010`, `docs/programmers-guide/` (result-pattern, exception-handling,
+  api-response-contract, localization, adding-a-language, troubleshooting), root `MIGRATIONS.md`
+  (exact per-service EF commands from the root + a terse AI cheat-block).
+
+### Verified
+
+All 4 solutions build **0 errors / 0 warnings**. `dotnet test`: SharedWeb 38, inventory 48u+7i,
+pos 19u+1i, gateway 3, notification 27u+5i, auth 37u + **7/9** integration (the 2 failures —
+`Admin_ListPermissions`, `SecurityQuestions_ConfigureAndVerify` — **fail identically at HEAD before
+this session**; pre-existing, need RBAC/security-question seed data). All 5 Docker containers Up +
+`/health/services` Healthy. Real gateway curls confirm the unified envelope, all-errors validation
+with camelCase fields, and Bangla messages via `?lang=bn`/`Accept-Language`. `frontend/inventory`
+(24/24) + `frontend/pos` (18/18) typecheck/lint/test/build green — **no frontend change was needed**
+(the failure envelope keeps the transitional RFC7807 `title`/`detail` aliases; success responses
+stay raw until C7).
+
+### Not done
+
+M1 C7 (success-envelope `{success:true,data:…}` + drop RFC7807 aliases — needs
+`frontend/*/lib/api/client.ts` in lockstep), M2 (DB provider factory), M3 (structured file
+logging + resilience + rate limiting), M4 (frontend i18n), M5 (multi-tenancy), M6 (licensing),
+M7 (reference-data CRUD + pickers), M8 (barcode scan-to-sell), M9 (idempotency), M10 (offline
+sync). See `AI-HANDOVER.md` §Q for the exact next command.

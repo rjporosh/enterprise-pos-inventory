@@ -110,12 +110,19 @@ Create a clean baseline before adding large commercial features.
 - [x] Apply migrations to clean databases — all 4 services, against a live Postgres via Docker
 - [x] Verify database schema — confirmed via `\dt` for all 4 databases
 - [ ] Resolve duplicated `BaseEntity` design intentionally — not revisited this session, still open
-- [ ] Review API response/error contracts — `docs/API-CONTRACT.md` vs. real controllers still
-      disagree per `docs/API-GAPS.md` §1; not reconciled this session
+- [~] Review API response/error contracts — **2026-09-03 (M1 C1–C6):** unified failure envelope
+      `{success,message,errors:[{code,field,message}],traceId,timestamp}` on all 5 services, the
+      all-errors-validation bug fixed, one centralized exception handler (incl. gateway), request
+      localization (en/bn). `docs/API-CONTRACT.md`/`API-GAPS.md` reconciled. See
+      `decisions/ADR-010`. **Remaining: M1 C7** — success responses still raw (`{success:true,data}`
+      wrap + frontend `client.ts` in lockstep + drop the transitional RFC7807 aliases).
 - [ ] Review versioning
 - [ ] Review pagination/filter/sort
-- [ ] Review correlation ID propagation
-- [ ] Implement idempotency infrastructure for financial writes
+- [~] Review correlation ID propagation — one `X-Correlation-Id` header contract across all 5
+      services + gateway; each sets `HttpContext.Items["CorrelationId"]` and the shared exception
+      handler / envelope report it. Message-bus (RabbitMQ) correlation propagation still TODO (M3).
+- [ ] Implement idempotency infrastructure for financial writes — designed (M9); `Idempotency-Key`
+      is already echoed by the shared exception handler when present.
 - [ ] Add ADR for gateway/BFF
 - [ ] Add ADR for resilience policies
 - [ ] Add ADR for subscription/entitlements
@@ -788,7 +795,12 @@ Only after reliable transaction data exists.
 **Status: FUTURE**
 
 - [ ] Multi-currency
-- [ ] Multi-language
+- [~] Multi-language — **backend request localization (en/bn) shipped 2026-09-03 (M1 C6):**
+      `?lang`/`Accept-Language`/user-claim resolution, resource-based (`PlatformMessages.resx`),
+      extensible per `docs/programmers-guide/adding-a-language.md`. Envelope strings + generic error
+      codes are en+bn; handler-authored domain messages and FluentValidation `.WithMessage`
+      literals localize incrementally (keyed by `Error.Code`). **Frontend i18n (`next-intl`,
+      both apps) is M4 — not started.**
 - [ ] Time zones
 - [ ] Regional tax
 - [ ] Regional receipts

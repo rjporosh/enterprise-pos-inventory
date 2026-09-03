@@ -1016,3 +1016,130 @@ docker compose up -d && sleep 15 && curl http://localhost:5010/health/services
 Do not re-verify Phases described in §L–§O from scratch — they are done and documented with real
 evidence. Do re-run the commands above once to confirm nothing regressed between sessions before
 starting new work.
+
+---
+
+## Q. Cross-cutting foundation (M1) — 2026-09-03 / 2026-09-04
+
+**Environment:** real .NET 10.0.400 SDK + Docker, all 5 services running in compose.
+
+This session started the "production hardening" plan agreed with the user (all 5 tracks — full
+localization, cross-cutting hardening, multi-tenancy, licensing, usability/barcode — plus offline
+sync, depth-first, commit to `main`). The full plan is at
+`~/.claude/plans/you-are-the-principle-deep-sprout.md`. **Milestone M1 (backend cross-cutting
+foundation) is C1–C6 + C8 done; C7 remains.** Milestones M2–M10 not started.
+
+### What shipped (7 commits, each independently verified)
+
+| Commit | What |
+|---|---|
+| `e3dce39` | **C1** `shared/shared-web` leaf project + multi-error `SharedKernel.Result`/`Error` (optional `Field`, `Errors` list, `Failure(IEnumerable<Error>)`). `ApiResponse<T>`/`ApiFailureResponse`/`ResultEnvelopeMapper`/`ControllerBaseExtensions`/`MinimalApiResultExtensions`. Added to all 4 solutions. 23 Docker-free mapper tests. |
+| `92126fb` | **C2** `SharedWeb.PlatformExceptionHandler` (`IExceptionHandler`) + `IExceptionMapper` — wired into inventory/pos/gateway; deleted both `GlobalExceptionHandler.cs`; middleware order harmonized (`CorrelationId → SerilogRequestLogging → UseExceptionHandler → …`). Scrubbed RFC7807 500, all-errors 400 for thrown `ValidationException`, 504/403/404/499 built-ins. |
+| `7409bb3` | **C3** Every inventory/pos controller failure branch → `this.ToApiResult(result)` (the shared mapper). **Fixes the bug where FluentValidation field errors were silently discarded.** `ConfigurePlatformApiBehavior()` reshapes `[ApiController]` 400s too. `ApiErrorItem.Of()` normalizes field names (`Request.CostPrice`→`costPrice`). Success responses **unchanged** (raw). |
+| `e673ef8` | **C4** notification-service: deleted its local `Result`/`Error`/`ApiResponse`; 28 files now `using SharedKernel;`; `.Message`→`.Description`; `ResultExtensions` is a thin adapter over `SharedWeb.MinimalApiResultExtensions`. |
+| `f061cb3` | **C5** auth + notification: deleted both `ExceptionHandlingMiddleware.cs`; `AuthExceptionMapper`/`NotificationExceptionMapper`. All 5 services now emit one failure shape + one scrubbed-500. |
+| `e1a3dcb` | **C6** `SharedWeb.PlatformLocalization` — `AddPlatformLocalization()`/`UsePlatformLocalization()` in all 5. `?lang`→`Accept-Language`→user-claim→`en`; cultures en/bn. `PlatformMessages[.bn].resx`. **Dockerfile fix: `apk add icu-libs` + `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`** in inventory/pos/gateway/auth (was crash-looping exit 139 on `CultureNotFoundException`). Deleted notification `LocalizationMiddleware`, auth dead `ILocalizationService`. |
+| `1956ffb` | **C8** `decisions/ADR-010-cross-cutting-web-layer.md`, `docs/programmers-guide/` (7 guides), root `MIGRATIONS.md` (+ terse AI cheat-block), `docs/API-CONTRACT.md`/`API-GAPS.md` updated to reality. |
+
+### Root causes fixed
+
+1. **All-errors validation was broken** (`inventory`/`pos`): the shared `ValidationBehavior`
+   collected every FluentValidation failure into `Result.ValidationErrors`, but **every controller
+   read only `result.Error.Code`** (`"VALIDATION_ERROR"`) and `result.Error.Description` (`null`)
+   via `return Problem(...)`. Fixed in C3 by routing every failure through `ResultEnvelopeMapper`
+   which emits `result.Errors`. Verified: `POST /api/v1/products {}` now returns all 3 errors with
+   camelCase `field`s.
+2. **3 incompatible `Result` types + 4 exception handlers + gateway had none** — consolidated onto
+   `SharedKernel.Result` + `SharedWeb.PlatformExceptionHandler` (C1–C5).
+3. **Localization crash in Docker (exit 139)**: `aspnet:*-alpine` runs globalization-invariant
+   (no ICU); `new RequestCulture("en")` throws. `notification`'s Dockerfile already had the ICU
+   fix; the other 4 did not. Added in C6.
+4. **notification's `LocalizationMiddleware` set `CultureInfo.CurrentCulture =` statically**
+   (leaks across requests on a pooled thread) — replaced by framework `UseRequestLocalization`
+   (per-request, auto-restored).
+
+### How it stays frontend-safe (the "bridge")
+
+C1–C6 required **zero** frontend change. The failure envelope carries the new
+`{success,message,errors[]}` **and** transitional RFC7807 aliases (`type`/`title`/`detail`/`status`),
+so the existing `frontend/*/src/lib/api/client.ts` (`problem.detail ?? problem.title`) keeps
+resolving — and validation 400s go from `detail:null` to a real per-field message. **Success
+responses are still raw** (bare `Guid`/DTO/`PagedResult`/`204`). Verified: `frontend/inventory`
+(24/24 tests) + `frontend/pos` (18/18) `typecheck`/`lint`/`test`/`build` all green at C3, unchanged
+by C4–C6 (backend-only).
+
+### Verification performed this session (all real)
+
+```
+dotnet build EnterprisePOS.sln / AuthService.sln / NotificationService.sln / Gateway.sln  -> 0 errors, 0 warnings (all)
+dotnet test:
+  SharedWeb.Tests            38   (mapper + exception handler + localization)
+  InventoryService.UnitTests 48   + IntegrationTests 7   (real Postgres)
+  PosService.UnitTests       19   + IntegrationTests 1
+  Gateway.Tests               3
+  NotificationService        27 unit + 5 integration (Testcontainers Postgres/RabbitMQ)
+  AuthService                37 unit + 7/9 integration  (see PRE-EXISTING FAILURES below)
+docker compose build (all 5) + up -d  -> all 5 containers Up + /health/services all Healthy
+curl through gateway :5010:
+  - 404 product / 404 sale       -> unified envelope + bridge aliases
+  - POST /products {}            -> 400, ALL validation errors, camelCase fields
+  - POST /products?lang=bn {}    -> message = "এক বা একাধিক ভ্যালিডেশন ত্রুটি হয়েছে।" (Bangla), all errors
+  - POST /auth/login (bad creds) -> 401, envelope + title="The email or password is incorrect."
+frontend/inventory + frontend/pos: npm ci + typecheck + lint + test + build  -> all green (24/24, 18/18)
+```
+
+### PRE-EXISTING failures (NOT caused this session — verified by `git stash` + test at HEAD `e673ef8`)
+
+- `AuthService.IntegrationTests.AuthApiTests.Admin_ListPermissions_ReturnsSuccess` — a fresh
+  "Customer" user calls `GET /api/v1/admin/permissions`, expects 200, gets 403. Needs an RBAC seed
+  (or the test relaxed). **Fails identically before M1.**
+- `AuthService.IntegrationTests.AuthApiTests.SecurityQuestions_ConfigureAndVerify_ReturnsSuccess` —
+  posts a random question id, expects 204, gets 400. Needs a seeded security question. **Fails
+  identically before M1.**
+
+### What is NOT done
+
+- **M1 C7 — success-envelope migration (the one coordinated frontend+backend change).** Move
+  success responses into `{success:true, data:…}`, unwrap `body.data` in both
+  `frontend/*/src/lib/api/client.ts`, update `InventoryService.IntegrationTests/Products/
+  ProductsControllerTests.cs` (`ReadFromJsonAsync<ApiResponse<Guid>>`) + the auth/notification
+  integration assertions that read raw success bodies. One sub-commit per endpoint group, per app,
+  full frontend DoD + browser QA each. **Final sub-commit: drop the RFC7807 `title`/`detail`/
+  `status` aliases from the failure body.** Mechanism: `ControllerBaseExtensions.ToApiResult` /
+  `MinimalApiResultExtensions` already have a `wrapSuccess` flag (default false for MVC) — flip it.
+- **M2** DB provider factory (config-switchable Postgres/SqlServer/MySQL/SQLite) — `shared`
+  factory still `throw new NotImplementedException` for non-Postgres.
+- **M3** structured file logging (`logs/runtime-errors`, `build-errors`, `query-logs`) + EF query
+  interceptor + graceful dependency-failure logging + DB/Redis/RabbitMQ health checks on
+  inventory/pos + rate limiting on inventory/pos.
+- **M4** frontend localization (`next-intl`, en/bn, both apps).
+- **M5** multi-tenancy (JWT bearer in pos/inventory, `Tenant` + `tenant_id` claim, EF query
+  filters, cross-tenant tests). ADR-009 has the file-path plan.
+- **M6** licensing/billing (`services/billing-service`, trial/plans/entitlements). ADR-009.
+- **M7** Category/Brand/Unit/Warehouse CRUD + frontend pickers (kills "paste a GUID").
+- **M8** barcode scan-to-sell + on-demand "today" report + cash-session GET.
+- **M9** sales idempotency (`Idempotency-Key`, Redis). **M10** offline POS + sync.
+- The auth domain messages + FluentValidation `.WithMessage("literal")` strings are English-only
+  (localization is keyed-incremental — add a resx entry named after the `Error.Code`, or make the
+  validator use `IStringLocalizer`; no handler change needed).
+
+### NEXT AGENT COMMAND
+
+```bash
+cd ~/Downloads/porosh/enterprise-pos-inventory
+
+# 1. confirm the baseline (should match this handover exactly)
+dotnet build EnterprisePOS.sln && dotnet test EnterprisePOS.sln          # 0/0, 38+48+19 unit, 1+7 integ
+cd services/gateway && dotnet build Gateway.sln && dotnet test Gateway.sln && cd ../..
+cd services/notification-service && dotnet build NotificationService.sln && dotnet test NotificationService.sln && cd ../..   # 27+5
+cd services/auth-service && dotnet build AuthService.sln && dotnet test AuthService.sln && cd ../..                            # 37 unit, 7/9 integ (2 pre-existing)
+docker compose up -d && sleep 15 && curl http://localhost:5010/health/services                                                # all Healthy
+
+# 2. read: ~/.claude/plans/you-are-the-principle-deep-sprout.md  (the full plan + progress)
+#          decisions/ADR-010-cross-cutting-web-layer.md          (M1 design + the C7 spec)
+#          docs/programmers-guide/api-response-contract.md
+
+# 3. do M1 C7 first (finishes M1): flip wrapSuccess:true in ToApiResult call sites service-by-service,
+#    each in the SAME commit as the matching frontend/<app>/src/lib/api/client.ts unwrap +
+#    integration-test update + full frontend DoD + browser QA. Then M2 (DB provider factory).
+```

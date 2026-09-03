@@ -179,6 +179,8 @@ migration (`docs/API-GAPS.md` tracks this as a real, open gap).
 | Metrics (Prometheus format) | `http://localhost:5010/metrics` (gateway), or each service's own `/metrics` |
 | RabbitMQ management UI | `http://localhost:15672` (guest/guest) |
 | A specific request's trail across logs | Every response carries an `X-Correlation-Id` header — search for that value in Seq |
+| Why did an API call fail? | Every failure is one shape: `{ "success": false, "message": "…", "errors": [ { "code", "field", "message" } ], "traceId", "timestamp" }` — **all** errors, not just the first. Unexpected 500s are scrubbed (no stack traces). See `docs/programmers-guide/api-response-contract.md`. |
+| Bengali API messages | add `?lang=bn` or send `Accept-Language: bn` — e.g. `curl "http://localhost:5010/api/v1/products?lang=bn" -X POST -d '{}' -H 'Content-Type: application/json'`. English is the default/fallback. |
 
 ## Known limitations
 
@@ -206,6 +208,10 @@ complete yet:
   — see `docs/API-GAPS.md`.
 - **No returns/refunds, no purchase orders, no expense tracking.** Only the "sell what's in stock"
   flow exists today.
+- **The frontend UI is English only.** Backend API messages localize to Bangla (`?lang=bn`), but
+  the two Next.js apps have no language switcher yet — that's milestone M4.
+- **No offline POS.** A network blip during checkout fails the sale; there is no local queue/sync
+  yet — milestone M10.
 
 ## For developers continuing this project
 
