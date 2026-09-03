@@ -15,6 +15,7 @@ public sealed class CorrelationIdMiddleware
             : Guid.NewGuid().ToString();
 
         context.Response.Headers[HeaderName] = correlationId;
+        context.Items["CorrelationId"] = correlationId;
         context.TraceIdentifier = correlationId;
 
         using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))

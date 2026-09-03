@@ -1,5 +1,6 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using AuthService.Api.Common;
 using AuthService.Api.Endpoints;
 using AuthService.Api.Middleware;
 using AuthService.Api.Security;
@@ -18,6 +19,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 using Serilog;
+using SharedWeb;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,6 +46,10 @@ builder.Host.UseSerilog((context, services, configuration) =>
 // ---------- Application / Infrastructure ----------
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Shared centralized exception handling (replaces the local ExceptionHandlingMiddleware).
+builder.Services.AddPlatformExceptionHandling();
+builder.Services.AddExceptionMapper<AuthExceptionMapper>();
 
 // ---------- Auth ----------
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
@@ -196,7 +202,7 @@ var app = builder.Build();
 // ---------- Middleware pipeline ----------
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {

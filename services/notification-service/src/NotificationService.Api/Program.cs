@@ -1,3 +1,4 @@
+using NotificationService.Api.Common;
 using NotificationService.Api.Endpoints;
 using NotificationService.Api.Grpc;
 using NotificationService.Api.Middleware;
@@ -9,6 +10,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 using Serilog;
+using SharedWeb;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -58,6 +60,10 @@ builder.Host.UseSerilog((context, services, configuration) =>
 // ---------- Application / Infrastructure ----------
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Shared centralized exception handling (replaces the local ExceptionHandlingMiddleware).
+builder.Services.AddPlatformExceptionHandling();
+builder.Services.AddExceptionMapper<NotificationExceptionMapper>();
 builder.Services.AddHttpContextAccessor();
 
 // ---------- Auth ----------
@@ -190,7 +196,7 @@ var app = builder.Build();
 // scope), then locale resolution and idempotency before routing/endpoints.
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseExceptionHandler();
 app.UseMiddleware<LocalizationMiddleware>();
 
 if (app.Environment.IsDevelopment())

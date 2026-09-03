@@ -82,6 +82,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AuthService.Application\AuthService.Application.csproj" />
+    <ProjectReference Include="..\..\..\..\shared\shared-kernel\src\shared-kernel.csproj" />
+    <ProjectReference Include="..\..\..\..\shared\shared-web\src\shared-web.csproj" />
     <ProjectReference Include="..\AuthService.Infrastructure\AuthService.Infrastructure.csproj" />
   </ItemGroup>
 
